@@ -110,4 +110,12 @@ class EquipementController extends AbstractController
             'equipements' => $equipementsNormalized
         ]));
     }
+
+
+    #[Route("/equipements/grouped", name:"all_equipements_grouped")]
+    public function getAllEquipementsGrouped(EquipementRepository $equipementRepository){
+        $equipementRepository->
+    }
 }
+
+

@@ -19,6 +19,12 @@ class EquipementRepository extends ServiceEntityRepository
         parent::__construct($registry, Equipement::class);
     }
 
+    public function getAllEquipementGroupedByPosition(){
+        return $this->createQueryBuilder('equipement')
+            ->select('equipement.name, equipement.id, positionEquipement.name')
+            ->leftJoin('equipement.positionEquipement', 'positionEquipement');
+    }
+
     // /**
     //  * @return Equipement[] Returns an array of Equipement objects
     //  */
