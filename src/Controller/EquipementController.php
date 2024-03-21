@@ -114,7 +114,9 @@ class EquipementController extends AbstractController
 
     #[Route("/equipements/grouped", name:"all_equipements_grouped")]
     public function getAllEquipementsGrouped(EquipementRepository $equipementRepository){
-        $equipementRepository->
+        $groupedEquipements = $equipementRepository->getAllEquipementGroupedByPosition();
+        dump($groupedEquipements);
+        return new Response(json_encode($groupedEquipements ));
     }
 }
 
