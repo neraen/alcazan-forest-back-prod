@@ -6,6 +6,7 @@ use App\Entity\Equipement;
 use App\Entity\EquipementCaracteristique;
 use App\Repository\CaracteristiqueRepository;
 use App\Repository\ClasseRepository;
+use App\Repository\EquipementCaracteristiqueRepository;
 use App\Repository\EquipementRepository;
 use App\Repository\PositionEquipementRepository;
 use App\Repository\RarityRepository;
@@ -115,8 +116,13 @@ class EquipementController extends AbstractController
     #[Route("/equipements/grouped", name:"all_equipements_grouped")]
     public function getAllEquipementsGrouped(EquipementRepository $equipementRepository){
         $groupedEquipements = $equipementRepository->getAllEquipementGroupedByPosition();
-        dump($groupedEquipements);
         return new Response(json_encode($groupedEquipements ));
+    }
+
+    #[Route("/equipements/info", name:"all_equipements_grouped")]
+    public function getAllEquipementsAndStats(EquipementCaracteristiqueRepository $equipementCaracteristiqueRepository){
+        $equipements = $equipementCaracteristiqueRepository->getAllEquipement();
+        return new Response(json_encode($equipements));
     }
 }
 

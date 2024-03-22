@@ -21,8 +21,10 @@ class EquipementRepository extends ServiceEntityRepository
 
     public function getAllEquipementGroupedByPosition(){
         return $this->createQueryBuilder('equipement')
-            ->select('equipement.nom, equipement.id, positionEquipement.name')
+            ->select('equipement.nom, equipement.id, positionEquipement.id, positionEquipement.name, caracteristique.nom, equipementCaracteristique.valeur')
             ->leftJoin('equipement.positionEquipement', 'positionEquipement')
+            ->leftJoin('equipement.equipementCaracteristiques', 'equipementCaracteristique')
+            ->leftJoin('equipementCaracteristique.caracteristique', 'caracteristique')
             ->getQuery()
             ->getResult();
     }
