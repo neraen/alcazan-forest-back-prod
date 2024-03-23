@@ -28,13 +28,22 @@ class EquipementController extends AbstractController
         EntityManagerInterface              $entityManager,
         CaracteristiqueRepository           $caracteristiqueRepository,
         PositionEquipementRepository        $positionEquipementRepository,
+        EquipementRepository                $equipementRepository,
+        EquipementCaracteristiqueRepository $equipementCaracteristiqueRepository,
         RarityRepository                    $rarityRepository,
         ClasseRepository                    $classeRepository
     ): Response {
         $data = json_decode($request->getContent(), true);
         $equipement = $data['equipement'];
 
-        $equipementEntity = new Equipement();
+        if($equipement['idEquipement']){
+            $equipementEntity = $equipementRepository->find($equipement['idEquipement']);
+        }else{
+            $equipementEntity = new Equipement();
+        }
+
+        dump($equipementEntity);
+
         $equipementEntity->setNom($equipement['name']);
         $equipementEntity->setIcone($equipement['icone']);
         $equipementEntity->setDescription($equipement['description']);
@@ -54,13 +63,19 @@ class EquipementController extends AbstractController
         $entityManager->persist($equipementEntity);
         $entityManager->flush();
 
-        foreach ($equipement['caracteristiques'] as $caracName => $caracValue){
-            if((int)$caracValue > 0){
-                $caracteristiqueEntity = $caracteristiqueRepository->findOneBy(['nom' => $caracName]);
-                $equipementCaracteristiqueEntity = new EquipementCaracteristique();
+        dump($equipement['caracteristiques']);
+        foreach ($equipement['caracteristiques'] as $caracteristique){
+            if($caracteristique['valeur']){
+                $caracteristiqueEntity = $caracteristiqueRepository->find($caracteristique['id']);
+                if($equipement['idEquipement'] && $caracteristiqueEntity){
+                    $equipementCaracteristiqueEntity = $equipementCaracteristiqueRepository->findOneBy(['equipement' => $equipementEntity, "caracteristique" => $caracteristiqueEntity], );
+                }else{
+                    $equipementCaracteristiqueEntity = new EquipementCaracteristique();
+                }
+
                 $equipementCaracteristiqueEntity->setEquipement($equipementEntity);
                 $equipementCaracteristiqueEntity->setCaracteristique($caracteristiqueEntity);
-                $equipementCaracteristiqueEntity->setValeur((int)$caracValue);
+                $equipementCaracteristiqueEntity->setValeur((int)$caracteristique['valeur']);
                 $entityManager->persist($equipementCaracteristiqueEntity);
                 $entityManager->flush();
             }
@@ -120,8 +135,12 @@ class EquipementController extends AbstractController
     }
 
     #[Route("/equipements/info", name:"all_equipements_grouped")]
-    public function getAllEquipementsAndStats(EquipementCaracteristiqueRepository $equipementCaracteristiqueRepository){
-        $equipements = $equipementCaracteristiqueRepository->getAllEquipement();
+    public function getAllEquipementsAndStats(EquipementRepository $equipementRepository, EquipementCaracteristiqueRepository $equipementCaracteristiqueRepository){
+        $equipements = $equipementRepository->getAllEquipementGroupedByPosition();
+        foreach ($equipements as &$equipement){
+            $caracteristiques = $equipementCaracteristiqueRepository->getAllCaracteristiquesByIdEquipement($equipement['id']);
+            $equipement['caracteristiques'] = $caracteristiques;
+        }
         return new Response(json_encode($equipements));
     }
 }

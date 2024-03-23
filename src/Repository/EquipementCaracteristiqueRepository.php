@@ -32,19 +32,7 @@ class EquipementCaracteristiqueRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    public function getAllEquipement(){
-        return $this->createQueryBuilder('equipementCaracteristique')
-            ->select('equipement.nom, equipement.id,
-                             positionEquipement.id, positionEquipement.name, caracteristique.id, caracteristique.nom,
-                             equipementCaracteristique.valeur, rarity.id, rarity.name, classe.id, classe.nom')
-            ->leftJoin('equipementCaracteristique.equipement', 'equipement')
-            ->leftJoin('equipement.positionEquipement', 'positionEquipement')
-            ->leftJoin('equipementCaracteristique.caracteristique', 'caracteristique')
-            ->leftJoin('equipement.rarity', 'rarity')
-            ->leftJoin('equipement.classe', 'classe')
-            ->getQuery()
-            ->getResult();
-    }
+
 
     // /**
     //  * @return EquipementCaracteristique[] Returns an array of EquipementCaracteristique objects
