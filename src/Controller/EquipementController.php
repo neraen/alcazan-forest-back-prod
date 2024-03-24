@@ -63,21 +63,30 @@ class EquipementController extends AbstractController
         $entityManager->persist($equipementEntity);
         $entityManager->flush();
 
-        dump($equipement['caracteristiques']);
+
         foreach ($equipement['caracteristiques'] as $caracteristique){
-            if($caracteristique['valeur']){
-                $caracteristiqueEntity = $caracteristiqueRepository->find($caracteristique['id']);
-                if($equipement['idEquipement'] && $caracteristiqueEntity){
-                    $equipementCaracteristiqueEntity = $equipementCaracteristiqueRepository->findOneBy(['equipement' => $equipementEntity, "caracteristique" => $caracteristiqueEntity], );
-                }else{
+            $caracteristiqueEntity = $caracteristiqueRepository->find($caracteristique['id']);
+            $equipementCaracteristiqueExist = false;
+
+            if($equipement['idEquipement']){
+                $equipementCaracteristiqueEntity = $equipementCaracteristiqueRepository->findOneBy(['equipement' => $equipementEntity, "caracteristique" => $caracteristiqueEntity]);
+                $equipementCaracteristiqueExist = $equipementCaracteristiqueEntity !== null;
+
+                if(!$equipementCaracteristiqueExist){
                     $equipementCaracteristiqueEntity = new EquipementCaracteristique();
                 }
+            }
 
+            if($caracteristique['valeur']){
                 $equipementCaracteristiqueEntity->setEquipement($equipementEntity);
                 $equipementCaracteristiqueEntity->setCaracteristique($caracteristiqueEntity);
                 $equipementCaracteristiqueEntity->setValeur((int)$caracteristique['valeur']);
                 $entityManager->persist($equipementCaracteristiqueEntity);
                 $entityManager->flush();
+            }else{
+                if($equipementCaracteristiqueExist){
+                    $entityManager->remove($equipementCaracteristiqueEntity);
+                }
             }
         }
 
