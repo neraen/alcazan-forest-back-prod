@@ -215,6 +215,7 @@ class QuestControlleur extends AbstractController
         $questEntity->setAlignement($alignement);
         $questEntity->setObjet($objet);
         $questEntity->setMinimalLevel($data['quest']['level']);
+        $questEntity->setName($data['quest']['name']);
 
         /* Sequences de la quete */
         $sequences = $data['quest']['sequences'];
@@ -300,7 +301,7 @@ class QuestControlleur extends AbstractController
 
                     switch ($actionType->getId()){
                         case ActionType::JSON->value:
-                            $action->setParams($sequenceAction['params']);
+                            $action->setParams($sequenceAction['actionParams']);
                             break;
                         case ActionType::POSSEDER_OBJET->value:
                         case ActionType::DONNER_OBJET->value:
@@ -332,7 +333,7 @@ class QuestControlleur extends AbstractController
                     $entityManager->persist($action);
                     $entityManager->flush();
 
-                    $sequenceActionEntity = $sequenceActionRepository->findBy(['sequence' => $sequenceEntity->getId(), 'action' => $action->getId()]) ?? new SequenceAction() ;
+                    $sequenceActionEntity = $sequenceActionRepository->findOneBy(['sequence' => $sequenceEntity->getId(), 'action' => $action->getId()]);
                     if(!$sequenceActionEntity){
                         $sequenceActionEntity = new SequenceAction();
                         $sequenceActionEntity->setSequence($sequenceEntity);

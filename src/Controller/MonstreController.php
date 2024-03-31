@@ -16,7 +16,7 @@ class MonstreController extends AbstractController
 {
     public function __construct( ){}
 
-    #[Route("/monstre/infos", name:"monstre_infos")]
+    #[Route("/monstres", name:"monstre_info")]
     public function getMonstresInfoForSelect(MonstreRepository $monstreRepository): Response {
         $pnjInfos = $monstreRepository->findAllAssoc();
         return new Response(json_encode($pnjInfos));
