@@ -14,6 +14,7 @@ use App\Repository\ActionRepository;
 use App\Repository\AlignementRepository;
 use App\Repository\BossRepository;
 use App\Repository\ConsommableRepository;
+use App\Repository\DialogueRepository;
 use App\Repository\EquipementRepository;
 use App\Repository\ObjetRepository;
 use App\Repository\PnjRepository;
@@ -201,6 +202,7 @@ class QuestControlleur extends AbstractController
         EquipementRepository        $equipementRepository,
         PnjRepository               $pnjRepository,
         ActionRepository            $actionRepository,
+        DialogueRepository          $dialogueRepository,
         EntityManagerInterface      $entityManager
     ): Response {
         $data = json_decode($request->getContent(), true);
@@ -277,11 +279,15 @@ class QuestControlleur extends AbstractController
             $sequenceEntity->setPnj($pnj);
 
             /** Dialogue */
-            $dialogue = new Dialogue();
-            $dialogue->setContenu($sequence['dialogueContent']);
-            $dialogue->setTitre($sequence['dialogueTitre']);
-            $entityManager->persist($dialogue);
-            $sequenceEntity->setDialogue($dialogue);
+            $dialogueEntity = $sequenceEntity->getDialogue();
+            if(!$dialogueEntity){
+                $dialogueEntity = new Dialogue();
+            }
+
+            $dialogueEntity->setContenu($sequence['dialogueContent']);
+            $dialogueEntity->setTitre($sequence['dialogueTitre']);
+            $entityManager->persist($dialogueEntity);
+            $sequenceEntity->setDialogue($dialogueEntity);
 
             $entityManager->persist($sequenceEntity);
             $entityManager->flush();
