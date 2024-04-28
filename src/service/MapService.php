@@ -91,7 +91,7 @@ class MapService
         return $distanceTotaleArrondie;
     }
 
-    public function getNearestMapInList(Carte $initialMap, array  $maps): Carte{
+    public function getNearestMapInList(Carte $initialMap, array $maps): Carte{
         $minimalDistance = -1;
         $nearestMap = null;
 

@@ -145,7 +145,7 @@ class InventaireController extends AbstractController
                 $shouldIncrementExistingEquipement->setQuantity($shouldIncrementExistingEquipement->getQuantity() + 1);
                 $entityManager->persist($shouldIncrementExistingEquipement);
                 $entityManager->flush();
-            }else{
+            } else {
                 $inventaireEquipementEntity = new InventaireEquipement();
                 $equipementEntity = $equipementRepository->findOneBy(['id' =>  $data['idEquipement']]);
                 $inventaireEquipementEntity->setQuantity(1);

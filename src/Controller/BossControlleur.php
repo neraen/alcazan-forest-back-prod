@@ -13,8 +13,6 @@ class BossControlleur extends AbstractController{
 
     public function __construct(){}
 
-    
-
     #[Route("/bosses", name:"all_bosses")]
     public function getAllBosses( BossRepository $bossRepository): Response {
         $bosses = $bossRepository->findAll();
