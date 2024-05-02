@@ -82,6 +82,7 @@ class PnjController extends AbstractController
                     $entityManager->persist($userQueteEntity);
                     $entityManager->flush();
                 }
+                break;
                 //$pnjInfo = $pnjService->getPnjShop($pnjEntity);
             case "action":
                 $pnjInfo['typePnj'] = "action";
