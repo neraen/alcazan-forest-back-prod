@@ -11,6 +11,7 @@ use App\Repository\InventaireRepository;
 use App\Repository\JoueurCaracteristiqueBonusRepository;
 use App\Repository\UserEquipementRepository;
 use Doctrine\ORM\EntityManager;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -73,7 +74,7 @@ class InventaireController extends AbstractController
         EquipementRepository                    $equipementRepository,
         InventaireEquipementRepository          $inventaireEquipementRepository,
         JoueurCaracteristiqueBonusRepository    $joueurCaracteristiqueBonusRepository,
-        EntityManager                           $entityManager
+        EntityManagerInterface                  $entityManager
     ): Response {
         $userId = $this->getUser()->getId();
         $data = json_decode($request->getContent(), true);
@@ -104,7 +105,7 @@ class InventaireController extends AbstractController
             $caracteristiqueId = $caracteristique->getCaracteristique()->getId();
             $joueurCaracteristiqueBonusEntity = $joueurCaracteristiqueBonusRepository->findOneBy(['caracteristique' => $caracteristiqueId, 'joueur' => $userId]);
             if($joueurCaracteristiqueBonusEntity){
-                $valeurCaracteristique = $caracteristique->getValeur() - $joueurCaracteristiqueBonusEntity->getPoints();
+                $valeurCaracteristique = $joueurCaracteristiqueBonusEntity->getPoints() - $caracteristique->getValeur() ;
                 $joueurCaracteristiqueBonusEntity->setPoints($valeurCaracteristique);
                 $entityManager->persist($joueurCaracteristiqueBonusEntity);
                 $entityManager->flush();
@@ -118,14 +119,14 @@ class InventaireController extends AbstractController
 
 
     #[Route("/inventaire/equipement/wear", name:"inventaire_equipement_wear")]
-    public function equipEquipement(
+    public function wearEquipement(
         Request                                 $request,
         UserEquipementRepository                $userEquipementRepository,
         InventaireRepository                    $inventaireRepository,
         EquipementRepository                    $equipementRepository,
         InventaireEquipementRepository          $inventaireEquipementRepository,
         JoueurCaracteristiqueBonusRepository    $joueurCaracteristiqueBonusRepository,
-        EntityManager                           $entityManager
+        EntityManagerInterface                  $entityManager
     ): Response {
 
         $userId = $this->getUser()->getId();

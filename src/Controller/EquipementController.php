@@ -42,8 +42,6 @@ class EquipementController extends AbstractController
             $equipementEntity = new Equipement();
         }
 
-        dump($equipementEntity);
-
         $equipementEntity->setNom($equipement['name']);
         $equipementEntity->setIcone($equipement['icone']);
         $equipementEntity->setDescription($equipement['description']);
@@ -68,6 +66,7 @@ class EquipementController extends AbstractController
             $caracteristiqueEntity = $caracteristiqueRepository->find($caracteristique['id']);
             $equipementCaracteristiqueExist = false;
 
+            $equipementCaracteristiqueEntity = new EquipementCaracteristique();
             if($equipement['idEquipement']){
                 $equipementCaracteristiqueEntity = $equipementCaracteristiqueRepository->findOneBy(['equipement' => $equipementEntity, "caracteristique" => $caracteristiqueEntity]);
                 $equipementCaracteristiqueExist = $equipementCaracteristiqueEntity !== null;

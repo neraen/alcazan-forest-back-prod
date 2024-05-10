@@ -15,7 +15,6 @@ use App\Repository\GuildeRepository;
 use App\Repository\InventaireConsommableRepository;
 use App\Repository\InventaireEquipementRepository;
 use App\Repository\InventaireRepository;
-use App\Repository\JoueurGuildeRepository;
 use App\Repository\MonstreCarreauRepository;
 use App\Repository\NiveauJoueurRepository;
 use App\Repository\QueteRepository;
@@ -84,7 +83,7 @@ class PlayerActionController extends AbstractController
             $valueReturned = $arrayStat['soin']['value'];
 
         }else if($spell->getType() === "buff"){
-            $buffApplyed = $spellService->applyBuffEffect($target, $spell);
+            $spellService->applyBuffEffect($target, $spell);
             $valueReturned = 0;
             $message = "Vous utilisez {$spell->getNom()} sur {$target->getPseudo()}";
         }
@@ -125,7 +124,6 @@ class PlayerActionController extends AbstractController
     ): Response {
         $data = json_decode($request->getContent(), true);
         $spell = $sortilegeRepository->find($data['spellId']);
-        $arrayStat = [];
         $user = $this->getUser();
 
         $target = $monstreCarreauRepository->find($data['targetId']);
