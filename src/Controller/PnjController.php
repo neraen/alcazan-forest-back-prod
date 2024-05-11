@@ -30,10 +30,16 @@ class PnjController extends AbstractController
     }
 
     #[Route("/pnj/create", name:"pnj_create")]
-    public function createPnj(Request $request, EntityManagerInterface $entityManager): Response {
+    public function createPnj(Request $request, EntityManagerInterface $entityManager, PnjRepository $pnjRepository): Response {
         $data = json_decode($request->getContent(), true);
         $pnj = $data['pnj'];
-        $pnjEntity = new Pnj();
+
+        if(!empty($pnj["id"])){
+            $pnjEntity = $pnjRepository->find($pnj["id"]);
+        }else{
+            $pnjEntity = new Pnj();
+        }
+
 
         $pnjEntity->setName($pnj['name']);
         $pnjEntity->setAvatar($pnj['avatar']);
@@ -70,6 +76,9 @@ class PnjController extends AbstractController
             case "quest":
                 $pnjInfo['typePnj'] = "quest";
                 $pnjInfo['title'] = $pnjEntity->getQuete()->getName();
+                $pnjInfo['avatar'] = $pnjEntity->getAvatar();
+                $pnjInfo['name'] = $pnjEntity->getName();
+                $pnjInfo['id'] = $pnjEntity->getId();
                 $userBeginQuest = $userQueteRepository->findOneBy(['user' => $this->getUser()->getId(), 'quete' => $pnjEntity->getQuete()->getId()]);
                 if(!$userBeginQuest){
                     $firstSequenceOfQuest = $sequenceRepository->findOneBy(['quete' => $pnjEntity->getQuete()->getId(), 'pnj' => $pnjEntity->getId(),'position' => 1]);

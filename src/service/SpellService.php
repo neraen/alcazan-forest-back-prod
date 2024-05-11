@@ -27,6 +27,8 @@ use Symfony\Component\Security\Core\Security;
 class SpellService
 {
     public $deathService;
+
+    private $caracteristiqueService;
     public $joueurCaracteristiqueRepository;
     public $joueurCaracteristiqueBonusRepository;
     public $niveauJoueurRepository;
@@ -38,8 +40,13 @@ class SpellService
     public $buffCaracteristiqueRepository;
     public $entityManager;
 
+    const DAMAGE_BALANCING_CONSTANT = 400;
+    const MAX_ARMOR_REDUCTION = 0.4;
+    const BASE_ARMOR_COEF = 2.2;
+
     public function __construct(
         DeathService $deathService,
+        CaracteristiqueService $caracteristiqueService,
         JoueurCaracteristiqueRepository $joueurCaracteristiqueRepository,
         JoueurCaracteristiqueBonusRepository $joueurCaracteristiqueBonusRepository,
         NiveauJoueurRepository $niveauJoueurRepository,
@@ -54,6 +61,7 @@ class SpellService
     )
     {
         $this->deathService = $deathService;
+        $this->caracteristiqueService = $caracteristiqueService;
         $this->joueurCaracteristiqueRepository = $joueurCaracteristiqueRepository;
         $this->joueurCaracteristiqueBonusRepository = $joueurCaracteristiqueBonusRepository;
         $this->niveauJoueurRepository = $niveauJoueurRepository;
@@ -76,8 +84,9 @@ class SpellService
         $caracteristiques = $this->getCaracsForSpell($user, $spell);
 
         $damageStat = [];
-        $armureJoueur = 0;
-        $damageStat['damage'] = $this->getSpellDamageByCarac($spell, $caracteristiques['principale'], $caracteristiques['secondaire']) - ($armureJoueur * 0.2);
+        $armorPoints = $this->caracteristiqueService->getPlayerArmor($user); // Points d'armure du défenseur
+        $spellDamage =  $this->getSpellDamageByCarac($spell, $caracteristiques['principale'], $caracteristiques['secondaire']);
+        $damageStat['damage'] = $this->computeDamageWithArmor($armorPoints, $spellDamage);
 
         $life = $target->getCurrentLife() - $damageStat['damage'];
 
@@ -136,7 +145,7 @@ class SpellService
 
         $bossLifePercent = floor($target->getActualLife() / $target->getMaxLife() * 100);
         $bossSpell = $this->bossSortilegeRepository->getBossSpellByLifePercent($target->getId(), $bossLifePercent);
-        $armureJoueur = 30;
+        $armureJoueur = $this->caracteristiqueService->getPlayerArmor($user);
         $damageReturns =  $bossSpell['degatBase'] + floor(mt_rand($target->getPuissance() * $bossSpell['coefSecondaire'],$target->getPuissance() * $bossSpell['coefPrincipal'])) - ($armureJoueur * 0.2);
 
         $lifeJoueurAfterReturns = $user->getCurrentLife() - $damageReturns;
@@ -257,7 +266,7 @@ class SpellService
     public function playerCanBeBuffed(Buff $buff, User $user): bool{
         $isPlayerBuffed = $this->userBuffRepository->findOneBy(['buff' => $buff->getId(), 'user' => $user->getId()]);
         $allBuffsInPlayer = $this->userBuffRepository->findBy(['user' => $user]);
-        return $isPlayerBuffed && count($allBuffsInPlayer) < 6;
+        return $isPlayerBuffed && count($allBuffsInPlayer) < 3;
     }
 
     public function getCaracsForSpell(User $user, Sortilege $spell): array{
@@ -300,6 +309,11 @@ class SpellService
         }
 
         return floor(mt_rand($minimal, $maximal));
+    }
+
+    public function computeDamageWithArmor(int $armorPoints, int $spellDamage){
+        $damageReduction = (1 - pow(self::BASE_ARMOR_COEF, -$armorPoints / self::DAMAGE_BALANCING_CONSTANT)) * self::MAX_ARMOR_REDUCTION;
+        return $spellDamage * (1 - $damageReduction);
     }
 
 
