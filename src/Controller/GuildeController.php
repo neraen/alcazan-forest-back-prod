@@ -47,7 +47,7 @@ class GuildeController extends AbstractController{
         if($guilde){
             $joueurs = $joueurGuildeRepository->getAllPlayerOfAGuilde($guilde->getId());
             foreach($joueurs as &$joueur){
-                $joueur['niveau'] = $niveauJoueurRepository->getPlayerLevel($user->getId())['niveau'];
+                $joueur['niveau'] = $niveauJoueurRepository->getPlayerLevel($user->getId());
             }
             $guildeInfos = [];
 

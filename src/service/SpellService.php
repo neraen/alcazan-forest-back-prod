@@ -84,7 +84,7 @@ class SpellService
         $caracteristiques = $this->getCaracsForSpell($user, $spell);
 
         $damageStat = [];
-        $armorPoints = $this->caracteristiqueService->getPlayerArmor($user); // Points d'armure du défenseur
+        $armorPoints = $this->caracteristiqueService->getPlayerArmor($target); // Points d'armure du défenseur
         $spellDamage =  $this->getSpellDamageByCarac($spell, $caracteristiques['principale'], $caracteristiques['secondaire']);
         $damageStat['damage'] = $this->computeDamageWithArmor($armorPoints, $spellDamage);
 
@@ -92,8 +92,8 @@ class SpellService
 
         if($life <= 0){
             $this->deathService->diePlayer($target);
-            $targetLevel = $this->niveauJoueurRepository->getPlayerLevel($target->getId())['niveau'];
-            $playerLevel = $this->niveauJoueurRepository->getPlayerLevel($target->getId())['niveau'];
+            $targetLevel = $this->niveauJoueurRepository->getPlayerLevel($target->getId());
+            $playerLevel = $this->niveauJoueurRepository->getPlayerLevel($user->getId());
             $honnorGain = $this->computeHonnorGain($user, $targetLevel, $playerLevel);
             $honnorLoose = $this->computeHonnorLoose($target, $targetLevel, $playerLevel);
             $damageStat['kill'] = true;

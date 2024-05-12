@@ -3,11 +3,13 @@
 
 namespace App\service;
 
+use App\Entity\Boss;
 use App\Entity\User;
 use App\Entity\Wrap;
 use App\Repository\BossRepository;
 use App\Repository\NiveauJoueurRepository;
 use App\Repository\UserBossRepository;
+use App\Repository\UserQueteRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 
@@ -17,22 +19,26 @@ class WrapService
     private $bossRepository;
     private $userBossRepository;
     private $niveauJoueurRepository;
+
+    private $userQueteRepository;
     private $entityManager;
 
     public function __construct(
         BossRepository $bossRepository,
         UserBossRepository $userBossRepository,
         NiveauJoueurRepository $niveauJoueurRepository,
+        UserQueteRepository $userQueteRepository,
         EntityManagerInterface $entityManager
     )
     {
         $this->userBossRepository = $userBossRepository;
         $this->bossRepository = $bossRepository;
         $this->niveauJoueurRepository = $niveauJoueurRepository;
+        $this->userQueteRepository = $userQueteRepository;
         $this->entityManager = $entityManager;
     }
 
-    public function canPlayerChangeMap(User $user, Wrap $wrap): array{
+    public function canPlayerChangeMap(User $user, Wrap $wrap): array {
         switch($wrap->getMapCondition()){
             case 'boss':
                 return $this->didPlayerKilledBoss($user, $wrap->getValue());
@@ -40,15 +46,16 @@ class WrapService
                 return $this->doesPlayerHaveLevel($user, $wrap->getValue());
             case 'alignement':
                 return $this->doesPlayerHaveGoodAlignement($user, $wrap->getValue());
+            case 'quest':
+                return $this->didPlayerFinishedQuest($user, $wrap->getValue());
             default:
                 return ['authorization' => true];
         }
 
     }
 
-    private function didPlayerKilledBoss(User $user, $value): array{
-        //$boss = $this->bossRepository->find($value);
-        $userBossEntity = $this->userBossRepository->findOneBy(['user' => $user->getId(), 'boss' => $value]);
+    private function didPlayerKilledBoss(User $user, int $bossId): array {
+        $userBossEntity = $this->userBossRepository->findOneBy(['user' => $user->getId(), 'boss' => $bossId]);
         $dateTimeNow = new \DateTime('now');
 
         $interval = $dateTimeNow->getTimestamp() - $userBossEntity->getLastKill()->getTimestamp();
@@ -63,23 +70,24 @@ class WrapService
             }
         }
 
+        $bossName = $userBossEntity->getBoss()->getName();
         return ['authorization' => $authorization,
-                'message' => $authorization ? "" : "Vous devez battre le boss avant d'acceder à la salle aux trésors"];
+                'message' => $authorization ? "" : "Vous devez battre $bossName avant d'acceder à la salle aux trésors"];
     }
 
-    private function doesPlayerHaveLevel(User $user, $value){
+    private function doesPlayerHaveLevel(User $user, int $requiredLevel): array {
         $niveauJoueur = $this->niveauJoueurRepository->getPlayerLevel($user->getId());
 
         $authorization = true;
-        if($niveauJoueur['niveau'] < $value){
+        if($niveauJoueur < $requiredLevel){
             $authorization = false;
         }
 
         return ['authorization' => $authorization,
-                'message' => $authorization ? "" : "Vous devez atteindre le niveau $value pour accéder à cet endroit"];
+                'message' => $authorization ? "" : "Vous devez atteindre le niveau $requiredLevel pour accéder à cet endroit"];
     }
 
-    private function doesPlayerHaveGoodAlignement(User $user, $value){
+    private function doesPlayerHaveGoodAlignement(User $user, $value): array {
         $authorization = true;
         if($user->getAlignement()->getId() !== $value){
             $authorization = false;
@@ -87,6 +95,12 @@ class WrapService
 
         return ['authorization' => $authorization,
                 'message' => $authorization ? "" : "Vous appartenir à l'alignement {$user->getAlignement()->getNom()} pour accéder à cet endroit"];
+    }
+
+    private function didPlayerFinishedQuest(User $user, int $questId): array {
+        $userQuete = $this->userQueteRepository->findOneBy(['user' => $user, 'quete' => $questId]);
+        return ['authorization' => $userQuete->getIsDone(),
+                'message' => $userQuete->getIsDone() ? "" : "Vous avoir terminé la quête {$userQuete->getQuete()->getName()} pour accéder à cet endroit "];
     }
 
 }

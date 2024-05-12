@@ -10,11 +10,10 @@ use App\Entity\Sequence;
 use App\Entity\SequenceAction;
 use App\Entity\UserQuete;
 use App\Enum\ActionType;
-use App\Repository\ActionRepository;
+use App\Repository\ActionTypeRepository;
 use App\Repository\AlignementRepository;
 use App\Repository\BossRepository;
 use App\Repository\ConsommableRepository;
-use App\Repository\DialogueRepository;
 use App\Repository\EquipementRepository;
 use App\Repository\ObjetRepository;
 use App\Repository\PnjRepository;
@@ -23,7 +22,7 @@ use App\Repository\RecompenseRepository;
 use App\Repository\SequenceActionRepository;
 use App\Repository\SequenceRepository;
 use App\Repository\UserQueteRepository;
-use App\Repository\UserSequenceRepository;
+use App\service\QuestService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -35,13 +34,14 @@ class QuestControlleur extends AbstractController
 {
     public function __construct(){}
 
-    #[Route("/api/pnj/sequance", name:"api_pnj_sequance")]
+    #[Route("/api/pnj/sequence", name:"api_pnj_sequence")]
     public function getPnjSequence(
         Request                     $request,
         PnjRepository               $pnjRepository,
         UserQueteRepository         $userQueteRepository,
         SequenceRepository          $sequenceRepository,
-        SequenceActionRepository    $sequenceActionRepository
+        SequenceActionRepository    $sequenceActionRepository,
+        QuestService                $questService
     ): Response {
         $dataPost = json_decode($request->getContent(), true);
         $pnj = $pnjRepository->find($dataPost['pnjId']);
@@ -50,7 +50,6 @@ class QuestControlleur extends AbstractController
 
         $joueurHasBeginQuest = $userQueteRepository->findOneBy(['user' => $user->getId(), 'quete' => $quete->getId()]);
 
-        $sequence = null;
         if($joueurHasBeginQuest){
             /** Gestion du cas ou la last id done */
 
@@ -68,12 +67,21 @@ class QuestControlleur extends AbstractController
         $dialogue = $sequence->getDialogue()->getContenu();
         if($sequence->getHasAction()){
             $actions = $sequenceActionRepository->getAllActionsBySequence($sequence->getId());
+            $sequenceConditionState = $questService->verifySequenceCondition($sequence->getId(), $user);
+        }else{
+            $sequenceConditionState = [
+                'isConditionValid' => true,
+                'messages' => ''
+            ];
         }
 
         $questData = [
             'title' => $quete->getName(),
             'dialogue' => $dialogue ?? '',
-            'actions' => $actions ?? []
+            'actions' => $actions ?? [],
+            'sequenceId' => $sequence->getId(),
+            'respectSequenceConditions' => $sequenceConditionState['isConditionValid'],
+            'messages' => $sequenceConditionState['messages']
         ];
 
         $sequenceResponse = json_encode($questData);
@@ -128,11 +136,18 @@ class QuestControlleur extends AbstractController
                 'equipement' => $recompense->getEquipement() ? $recompense->getEquipement()->getId() : 0,
                 'consommable' => $recompense->getConsommable() ? $recompense->getConsommable()->getId() : 0,
                 'quantity' => $recompense->getQuantity() ?? 0
-            ] : [];
+            ] : [
+                'money' => 0,
+                'experience' => 0,
+                'objet' => 0,
+                'equipement' => 0,
+                'consommable' =>  0,
+                'quantity' => 0
+            ];
             $sequencesData['sequences'][] = [
                 'id' => $sequence->getId(),
                 'position' => $sequence->getPosition(),
-                'actions' => $sequenceActionRepository->getAllActionsBySequence($sequence->getId()),
+                'actions' => $sequenceActionRepository->getAllActionsBySequenceWithJoin($sequence->getId()),
                 'isLast' => $sequence->getIsLast(),
                 'dialogueContent' => $sequence->getDialogue()->getContenu(),
                 'dialogueTitre' => $sequence->getDialogue()->getTitre(),
@@ -201,8 +216,7 @@ class QuestControlleur extends AbstractController
         RecompenseRepository        $recompenseRepository,
         EquipementRepository        $equipementRepository,
         PnjRepository               $pnjRepository,
-        ActionRepository            $actionRepository,
-        DialogueRepository          $dialogueRepository,
+        ActionTypeRepository        $actionTypeRepository,
         EntityManagerInterface      $entityManager
     ): Response {
         $data = json_decode($request->getContent(), true);
@@ -236,42 +250,50 @@ class QuestControlleur extends AbstractController
             /** Recompense  */
             if($sequence['recompense'] !== []){
                 $recompenseEntity = $recompenseRepository->findOneBy(['sequence' => $sequenceEntity->getId()]);
-                if(!$recompenseEntity){
+                if(!$recompenseEntity) {
                     $recompenseEntity = new Recompense();
-                    if(isset($sequence['recompense']['argent']) && $sequence['recompense']['argent'] > 0){
-                        $recompenseEntity->setMoney($sequence['recompense']['argent']);
-                    }
-                    if(isset($sequence['recompense']['experience']) && $sequence['recompense']['experience'] > 0){
-                        $recompenseEntity->setExperience($sequence['recompense']['experience']);
-                    }
-                    if(isset($sequence['recompense']['objet']) && $sequence['recompense']['objet'] > 0){
-                        $recompenseEntity->setObjet($objetRepository->find($sequence['recompense']['objet']));
-                    }
-                    if(isset($sequence['recompense']['equipement']) && $sequence['recompense']['equipement'] > 0){
-                        $recompenseEntity->setEquipement($equipementRepository->find($sequence['recompense']['equipement']));
-                    }
-
-                    $recompenseEntity->setSequence($sequenceEntity);
-                    $entityManager->persist($recompenseEntity);
-                    $entityManager->flush();
-                }else{
-                    if(isset($sequence['recompense']['argent']) && $sequence['recompense']['argent'] > 0){
-                        $recompenseEntity->setMoney($sequence['recompense']['argent']);
-                    }
-                    if(isset($sequence['recompense']['experience']) && $sequence['recompense']['experience'] > 0){
-                        $recompenseEntity->setExperience($sequence['recompense']['experience']);
-                    }
-                    if(isset($sequence['recompense']['objet']) && $sequence['recompense']['objet'] > 0){
-                        $recompenseEntity->setObjet($objetRepository->find($sequence['recompense']['objet']));
-                    }
-                    if(isset($sequence['recompense']['equipement']) && $sequence['recompense']['equipement'] > 0){
-                        $recompenseEntity->setEquipement($equipementRepository->find($sequence['recompense']['equipement']));
-                    }
-
-                    $recompenseEntity->setSequence($sequenceEntity);
-                    $entityManager->persist($recompenseEntity);
-                    $entityManager->flush();
                 }
+
+                if(isset($sequence['recompense']['money'])){
+                    $recompenseEntity->setMoney($sequence['recompense']['money']);
+                }
+
+                if(isset($sequence['recompense']['experience'])){
+                    $recompenseEntity->setExperience($sequence['recompense']['experience']);
+                }
+
+                if(isset($sequence['recompense']['quantity'])){
+                    $recompenseEntity->setQuantity($sequence['recompense']['quantity']);
+                }
+
+                if(isset($sequence['recompense']['objet'])){
+                    if($sequence['recompense']['objet'] === 0){
+                        $recompenseEntity->setObjet(null);
+                    }else{
+                        $recompenseEntity->setObjet($objetRepository->find($sequence['recompense']['objet']));
+                    }
+
+                }
+
+                if(isset($sequence['recompense']['equipement'])){
+                    if($sequence['recompense']['equipement'] === 0){
+                        $recompenseEntity->setEquipement(null);
+                    }else{
+                        $recompenseEntity->setEquipement($equipementRepository->find($sequence['recompense']['equipement']));
+                    }
+                }
+
+                if(isset($sequence['recompense']['consommable'])){
+                    if($sequence['recompense']['consommable'] === 0){
+                        $recompenseEntity->setConsommable(null);
+                    }else{
+                        $recompenseEntity->setConsommable($consommableRepository->find($sequence['recompense']['consommable']));
+                    }
+                }
+
+                $recompenseEntity->setSequence($sequenceEntity);
+                $entityManager->persist($recompenseEntity);
+                $entityManager->flush();
             }
 
             /** pnj */
@@ -289,50 +311,75 @@ class QuestControlleur extends AbstractController
             $entityManager->persist($dialogueEntity);
             $sequenceEntity->setDialogue($dialogueEntity);
 
-            $entityManager->persist($sequenceEntity);
-            $entityManager->flush();
 
+            $existingActions = $sequenceActionRepository->findBy(['sequence' => $sequenceEntity]);
+            if(!empty($existingActions)){
+                foreach ($existingActions as $sequenceAction){
+                    $entityManager->remove($sequenceAction);
+                    $entityManager->remove($sequenceAction->getAction());
+                    $entityManager->flush();
+                }
+            }
 
             $sequenceActions = $sequence['actions'];
             if($sequenceActions !== []){
+                $sequenceEntity->setHasAction(true);
                 foreach($sequenceActions as $index => $sequenceAction){
-                    $action = $actionRepository->find($sequenceAction['actionId']);
-                    $actionType = $actionRepository->find($sequenceAction['actionTypeId']);
-                    if(!$action){
-                        $action = new Action();
-                        $actionType->setActionType($actionType);
-                        $entityManager->persist($action);
-                        $entityManager->flush();
-                    }
+
+                    $actionType = $actionTypeRepository->find($sequenceAction['actionTypeId']);
+                    $action = new Action();
+                    $action->setActionType($actionType);
 
                     switch ($actionType->getId()){
                         case ActionType::JSON->value:
                             $action->setParams($sequenceAction['actionParams']);
+                            $actionLink = !empty($sequenceAction['actionApiLink']) ? $sequenceAction['actionApiLink'] : '';
+                            $action->setApiLink($actionLink);
                             break;
                         case ActionType::POSSEDER_OBJET->value:
+                            $action->setObjet($objetRepository->find((int)$sequenceAction['objets']));
+                            $action->setQuantity($sequenceAction['actionQuantity']);
+                            $action->setApiLink("action/posseder/objet");
+                            break;
                         case ActionType::DONNER_OBJET->value:
                             $action->setObjet($objetRepository->find((int)$sequenceAction['objets']));
                             $action->setQuantity($sequenceAction['actionQuantity']);
+                            $action->setApiLink("action/donner/objet");
                             break;
                         case ActionType::DONNER_EQUIPEMENT->value:
                             $action->setEquipement($equipementRepository->find((int)$sequenceAction['equipements']));
                             $action->setQuantity($sequenceAction['actionQuantity']);
+                            $action->setApiLink("action/donner/equipement");
                             break;
                         case ActionType::ATTEINDRE_LEVEL->value:
+                            $action->setQuantity($sequenceAction['actionQuantity']);
+                            $action->setApiLink("action/atteindre/level");
+                            break;
                         case ActionType::DONNER_OR->value:
                             $action->setQuantity($sequenceAction['actionQuantity']);
+                            $action->setApiLink("action/donner/or");
                             break;
                         case ActionType::BATTRE_BOSS->value:
                             $action->setBoss($bossRepository->find((int)$sequenceAction['bosses']));
+                            $action->setApiLink("action/battre/boss");
                             break;
                         case ActionType::PARLER_PNJ->value:
                             $action->setPnj($pnjRepository->find((int)$sequenceAction['pnj']));
+                            $action->setApiLink("action/parler/pnj");
+                            break;
+                        case ActionType::PASSER_DIALOGUE->value:
+                            $action->setApiLink("action/passer/dialogue");
                             break;
                         case ActionType::DONNER_CONSOMMABLE->value:
                             $action->setConsommable($consommableRepository->find((int)$sequenceAction['consommables']));
                             $action->setQuantity($sequenceAction['actionQuantity']);
+                            $action->setApiLink("action/donner/consommable");
                             break;
 
+                    }
+
+                    if(isset($sequenceAction['actionMessage']) && !empty($sequenceAction['actionMessage'])){
+                        $action->setMessage($sequenceAction['actionMessage']);
                     }
 
                     $action->setName($sequenceAction['actionName']);
@@ -351,8 +398,10 @@ class QuestControlleur extends AbstractController
                     $entityManager->flush();
                 }
             }
+            $entityManager->persist($sequenceEntity);
+            $entityManager->flush();
         }
 
-        return new Response('ok');
+        return new Response('La quête a bien été mise à jour');
     }
 }

@@ -29,13 +29,13 @@ class NiveauJoueurRepository extends ServiceEntityRepository
             ->getSingleResult();
     }
 
-    public function getPlayerLevel($userId){
+    public function getPlayerLevel($userId): ?int {
         return $this->createQueryBuilder('nj')
             ->select('n.niveau')
             ->leftJoin('nj.niveau', 'n')
             ->where('nj.user = '.$userId)
             ->getQuery()
-            ->getSingleResult();
+            ->getSingleScalarResult();
     }
 
     public function addExperience($userId, $experience){

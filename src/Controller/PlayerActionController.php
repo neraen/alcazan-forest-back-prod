@@ -27,6 +27,7 @@ use App\Repository\UserRepository;
 use App\service\DeathService;
 use App\service\HistoriqueService;
 use App\service\LevelingService;
+use App\service\QuestService;
 use App\service\SpellService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\OptimisticLockException;
@@ -271,6 +272,7 @@ class PlayerActionController extends AbstractController
     #[Route("/user/choice/classe", name:"user_choose_class")]
     public function chooseAClass(
         Request                         $request,
+        QuestService                    $questService,
         ClasseRepository                $classeRepository,
         UserRepository                  $userRepository,
         UserQueteRepository             $userQueteRepository,
@@ -285,12 +287,12 @@ class PlayerActionController extends AbstractController
     ): Response {
         $data = json_decode($request->getContent(), true);
         $user = $this->getUser();
-        $classeEntity = $classeRepository->findBy(['nom' => $data['classe']]);
-        $userRepository->updateClasse($classeEntity[0]->getId(), $this->getUser()->getId());
+        $classeEntity = $classeRepository->findOneBy(['nom' => $data['classe']]);
+        $userRepository->updateClasse($classeEntity->getId(), $this->getUser()->getId());
 
         $sequenceId = $sequenceActionRepository->getSequenceByAction($data['actionId']);
 
-        $recompenseEntity = $recompenseRepository->find($sequenceId);
+        $recompenseEntity = $recompenseRepository->findOneBy(['sequence' => $sequenceId]);
         $message = "La classe à bien été modifiée.<br />";
 
 
@@ -349,7 +351,7 @@ class PlayerActionController extends AbstractController
             $entityManager->persist($userQueteEntity);
             $entityManager->flush();
         }else{
-           /* todo trouver la sequence de position n+1 pour le pnj / quete */
+            $questService->setNextSequence($user->getId(), $sequenceId);
         }
 
         $json = json_encode(['message' => $message]);

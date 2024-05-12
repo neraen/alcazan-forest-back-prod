@@ -77,7 +77,7 @@ class JoueurController extends AbstractController
 
         $userLevel = $niveauJoueurRepository->getPlayerLevel($user->getId());
         $playerSpellsAllowed = array_filter($playerSpells, function($spell) use ($userLevel){
-            return $spell['niveau'] <= $userLevel['niveau'];
+            return $spell['niveau'] <= $userLevel;
         });
 
         $playerSpellsResponse = json_encode($playerSpellsAllowed);
@@ -105,7 +105,7 @@ class JoueurController extends AbstractController
         $userLevel = $niveauJoueurRepository->getPlayerLevel($this->getUser()->getId());
         /**todo rajouter dans allowed le is ordered*/
         $playerSpellsAllowed = array_filter($playerSpells, function($spell) use ($userLevel){
-            return $spell['niveau'] <= $userLevel['niveau'];
+            return $spell['niveau'] <= $userLevel;
         });
 
         $playerSpellsResponse = json_encode($playerSpellsAllowed);
@@ -239,7 +239,7 @@ class JoueurController extends AbstractController
         $caracteristiques = $joueurCaracteristiqueRepository->getJoueurCaracteristiques($userId);
         $caracteristiquesInfo['caracteristiques'] = $caracteristiques;
         $levelJoueur = $niveauJoueurRepository->getPlayerLevel($userId);
-        $maxCaracsAllowed = ($levelJoueur['niveau'] * 5) + 6;
+        $maxCaracsAllowed = ($levelJoueur * 5) + 6;
         $caracteristiquesInfo['maxCaracsAllowed'] = $maxCaracsAllowed;
 
         $jsonCaracteristiques = json_encode($caracteristiquesInfo);
@@ -264,7 +264,7 @@ class JoueurController extends AbstractController
                 $user = $this->getUser();
                 $levelJoueur = $niveauJoueurRepository->getPlayerLevel($this->getUser()->getId());
                 $caracteristiquesBonus = $joueurCaracteristiqueBonusRepository->findOneBy(['caracteristique' => $caracteristiqueId, 'joueur' => $user->getId()])->getPoints();
-                $maxLife = 400 + (($value+$caracteristiquesBonus) * 5) + ((int)$levelJoueur['niveau'] * 8);
+                $maxLife = 400 + (($value+$caracteristiquesBonus) * 5) + ((int)$levelJoueur * 8);
                 $user->setMaxLife($maxLife);
                 $entityManager->persist($user);
                 $entityManager->flush();

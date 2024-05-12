@@ -89,6 +89,11 @@ class Action
      */
     private $quantity;
 
+    /**
+     * @ORM\Column(type="text", nullable=true)
+     */
+    private $message;
+
 
 
     public function __construct()
@@ -302,6 +307,18 @@ class Action
     public function setQuantity(?int $quantity): self
     {
         $this->quantity = $quantity;
+
+        return $this;
+    }
+
+    public function getMessage(): ?string
+    {
+        return $this->message;
+    }
+
+    public function setMessage(?string $message): self
+    {
+        $this->message = $message;
 
         return $this;
     }

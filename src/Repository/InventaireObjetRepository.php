@@ -3,6 +3,8 @@
 namespace App\Repository;
 
 use App\Entity\InventaireObjet;
+use App\Entity\Objet;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -17,6 +19,18 @@ class InventaireObjetRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, InventaireObjet::class);
+    }
+
+    public function getObjectQuantityInUserInventaire(int $userId, int $objetId): ?array
+    {
+
+        return $this->createQueryBuilder('inventaireObjet')
+            ->select('inventaireObjet.quantity')
+            ->leftJoin('inventaireObjet.inventaire', 'inventaire')
+            ->where('inventaire.user = '.$userId)
+            ->andWhere('inventaireObjet.objet = '.$objetId)
+            ->getQuery();
+
     }
 
     // /**

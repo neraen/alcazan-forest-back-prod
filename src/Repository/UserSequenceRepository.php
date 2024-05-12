@@ -19,7 +19,7 @@ class UserSequenceRepository extends ServiceEntityRepository
         parent::__construct($registry, UserSequence::class);
     }
 
-    public function getActualSequanceForPnjAndPlayer($userId, $pnjId){
+    public function getActualSequenceForPnjAndPlayer($userId, $pnjId){
         return $this->createQueryBuilder('sequenceUser')
             ->select('dialogue.contenu as dialogContent', 'dialogue.titre as dialogTitle', 'action.name as actionName', 'action.api_link as actionLink', 'action.params as actionParams')
             ->leftJoin('sequenceUser.Sequence', 'sequence')
