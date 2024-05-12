@@ -75,7 +75,6 @@ class ActionController extends AbstractController
     #[Route("/donner/objet", name:"action_donner_objet")]
     public function actionDonnerObjet(
         Request $request,
-        QuestService $questService,
         ActionRepository $actionRepository,
         InventaireObjetRepository $inventaireObjetRepository,
         InventaireRepository $inventaireRepository,
@@ -98,8 +97,7 @@ class ActionController extends AbstractController
             }
             $entityManager->flush();
             $response = "Success : Vous avez bien donné les objets demandés";
-            $eventDispatcher->dispatch(new NextQuestSequenceEvent($user->getId(), $data['sequenceId']));
-            $questService->setNextSequence($user->getId(), $data['sequenceId']);
+            $eventDispatcher->dispatch(new NextQuestSequenceEvent($user, $data['sequenceId']));
         }else{
             $response = "Erreur : vous n'avez pas les objets nécéssaire pour réaliser l'action";
         }

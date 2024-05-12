@@ -5,6 +5,8 @@ namespace App\Controller;
 use App\Entity\Friend;
 use App\Entity\InventaireEquipement;
 use App\Entity\JoueurGuilde;
+use App\Enum\Classe;
+use App\Event\NextQuestSequenceEvent;
 use App\Repository\BossRecompenseRepository;
 use App\Repository\BossRepository;
 use App\Repository\ClasseRepository;
@@ -26,6 +28,7 @@ use App\Repository\UserQueteRepository;
 use App\Repository\UserRepository;
 use App\service\DeathService;
 use App\service\HistoriqueService;
+use App\service\InventaireService;
 use App\service\LevelingService;
 use App\service\QuestService;
 use App\service\SpellService;
@@ -33,6 +36,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -272,91 +276,41 @@ class PlayerActionController extends AbstractController
     #[Route("/user/choice/classe", name:"user_choose_class")]
     public function chooseAClass(
         Request                         $request,
-        QuestService                    $questService,
+        InventaireService               $inventaireService,
         ClasseRepository                $classeRepository,
         UserRepository                  $userRepository,
-        UserQueteRepository             $userQueteRepository,
         SequenceActionRepository        $sequenceActionRepository,
-        SequenceRepository              $sequenceRepository,
-        RecompenseRepository            $recompenseRepository,
-        InventaireRepository            $inventaireRepository,
-        InventaireEquipementRepository  $inventaireEquipementRepository,
         EquipementRepository            $equipementRepository,
-        NiveauJoueurRepository          $niveauJoueurRepository,
-        EntityManagerInterface          $entityManager
+        EventDispatcherInterface        $eventDispatcher
     ): Response {
         $data = json_decode($request->getContent(), true);
         $user = $this->getUser();
         $classeEntity = $classeRepository->findOneBy(['nom' => $data['classe']]);
         $userRepository->updateClasse($classeEntity->getId(), $this->getUser()->getId());
-
         $sequenceId = $sequenceActionRepository->getSequenceByAction($data['actionId']);
 
-        $recompenseEntity = $recompenseRepository->findOneBy(['sequence' => $sequenceId]);
         $message = "La classe à bien été modifiée.<br />";
 
-
-        if($recompenseEntity->getEquipement()){
-            /* todo fonctionaliser ça */
-            $idEquipement = $recompenseEntity->getEquipement()->getId();
-            $inventaireEntity = $inventaireRepository->findOneBy(['user' => $user->getId()]);
-            $shouldIncrementExistingEquipement = $inventaireEquipementRepository->findOneBy(['inventaire' => $inventaireEntity->getId(), 'equipement' => $idEquipement]);
-
-            if($shouldIncrementExistingEquipement){
-                $shouldIncrementExistingEquipement->setQuantity($shouldIncrementExistingEquipement->getQuantity() + 1);
-                $entityManager->persist($shouldIncrementExistingEquipement);
-                $entityManager->flush();
-            }else{
-                $inventaireEquipementEntity = new InventaireEquipement();
-                $equipementEntity = $equipementRepository->findOneBy(['id' =>  $idEquipement]);
-                $inventaireEquipementEntity->setQuantity(1);
-                $inventaireEquipementEntity->setEquipement($equipementEntity);
-                $inventaireEquipementEntity->setInventaire($inventaireEntity);
-                $entityManager->persist($inventaireEquipementEntity);
-                $entityManager->flush();
-            }
+        /* todo : mettre en place des récompense "par action" dans les quêtes + utiliser les id */
+        switch ($data['classe']){
+            case Classe::ARCHER->value:
+                $equipement = $equipementRepository->findOneBy(['nom' => "Arc de l'archer débutant"]);
+                break;
+            case Classe::SORCIER->value:
+                $equipement = $equipementRepository->findOneBy(['nom' => "Baton du sorcier débutant"]);
+                break;
+            case Classe::GUERRIER->value:
+                $equipement = $equipementRepository->findOneBy(['nom' => "Epée du guerrier débutant"]);
+                break;
+            case Classe::MOINE->value:
+                $equipement = $equipementRepository->findOneBy(['nom' => "Baton du moine débutant"]);
+                break;
         }
 
-        $moneyRecompense = $recompenseEntity->getMoney();
+        $inventaireService->addEquipementToUserInventaire($user->getId(), $equipement->getId());
 
-        if(!is_null($moneyRecompense) && $moneyRecompense > 0){
-            $initialMoney = $user->getMoney();
-            $moneyAfterRecompense = $initialMoney + $moneyRecompense;
-            $user->setMoney($moneyAfterRecompense);
-            $entityManager->persist($user);
-            $entityManager->flush();
-            $message .= "Vous gagnez $moneyRecompense pièces d'Or.";
-        }
-
-        $experienceRecompense = $recompenseEntity->getExperience();
-        if(!is_null($experienceRecompense) && $experienceRecompense > 0){
-            $levelData = $niveauJoueurRepository->getNiveauAndExperience($user->getId());
-            $newExperienceScore = $levelData['experienceActuelle'] + $experienceRecompense;
-
-            if($newExperienceScore >= $levelData['experienceMax']){
-                $resteExperience = $newExperienceScore - $levelData['experienceMax'];
-                $newLevel = $levelData['niveau'] + 1;
-                $niveauJoueurRepository->addExperienceAndUpLevel($user->getId(), $resteExperience, $newLevel);
-            }else{
-                $niveauJoueurRepository->addExperience($user->getId(), $newExperienceScore);
-            }
-
-            $message .= "Vous gagnez $experienceRecompense points d'expériences.";
-        }
-
-        $sequence = $sequenceRepository->find($sequenceId);
-        if($sequence->getIsLast()){
-            $userQueteEntity = $userQueteRepository->findOneBy(['user' => $user->getId(), 'sequence' =>$sequenceId]);
-            $userQueteEntity->setIsDone(true);
-            $entityManager->persist($userQueteEntity);
-            $entityManager->flush();
-        }else{
-            $questService->setNextSequence($user->getId(), $sequenceId);
-        }
-
+        $eventDispatcher->dispatch(new NextQuestSequenceEvent($user, $sequenceId));
         $json = json_encode(['message' => $message]);
-
-
 
         return new Response($json);
     }

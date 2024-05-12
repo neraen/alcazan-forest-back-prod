@@ -4,7 +4,9 @@ namespace App\service;
 
 use App\Entity\Action;
 use App\Entity\InventaireConsommable;
+use App\Entity\InventaireEquipement;
 use App\Entity\Quete;
+use App\Entity\Sequence;
 use App\Entity\User;
 use App\Enum\ActionType;
 use App\Repository\InventaireConsommableRepository;
@@ -17,6 +19,7 @@ use App\Repository\SequenceActionRepository;
 use App\Repository\SequenceRepository;
 use App\Repository\UserQueteRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpFoundation\Session\Session;
 
 class QuestService
 {
@@ -24,6 +27,8 @@ class QuestService
     private string $questMessage = "";
 
     public function __construct(
+        private readonly InventaireService $inventaireService,
+        private readonly LevelingService $levelingService,
         private readonly SequenceActionRepository $sequenceActionRepository,
         private readonly SequenceRepository $sequenceRepository,
         private readonly UserQueteRepository $userQueteRepository,
@@ -130,8 +135,36 @@ class QuestService
         }
     }
 
-    public function giveRecompenseToUser(int $userId, int $sequenceId){
-        $recompense = $this->recompenseRepository->findOneBy(['sequence' => $sequenceId]);
+    public function setQuestDone(User $user, Sequence $sequence): void {
+        $userQueteEntity = $this->userQueteRepository->findOneBy(['user' => $user, 'sequence' => $sequence]);
+        $userQueteEntity->setIsDone(true);
+        $this->entityManager->persist($userQueteEntity);
+        $this->entityManager->flush();
+    }
 
+    /** todo: externaliser les messages => mieux, les gérer en front en renvoyant un tableau de récompenses */
+    public function giveRecompenseToUser(User $user, int $sequenceId): string {
+        $userId = $user->getId();
+        $recompenseEntity = $this->recompenseRepository->findOneBy(['sequence' => $sequenceId]);
+        $message = "";
+        if($recompenseEntity->getEquipement()){
+            $idEquipement = $recompenseEntity->getEquipement()->getId();
+            $this->inventaireService->addEquipementToUserInventaire($userId, $idEquipement);
+            $message .= "Vous recevez l'équipement {$recompenseEntity->getEquipement()->getNom()}";
+        }
+
+        $moneyRecompense = $recompenseEntity->getMoney();
+        if(!is_null($moneyRecompense) && $moneyRecompense > 0){
+            $this->inventaireService->giveMoneyToUser($user, $moneyRecompense);
+            $message .= "Vous gagnez $moneyRecompense pièces d'Or.";
+        }
+
+        $experienceRecompense = $recompenseEntity->getExperience();
+        if(!is_null($experienceRecompense) && $experienceRecompense > 0){
+            $this->levelingService->giveExperienceToAPlayer($experienceRecompense, $userId);
+            $message .= "Vous gagnez $experienceRecompense points d'expériences.";
+        }
+
+        return $message;
     }
 }
