@@ -2,11 +2,14 @@
 
 namespace App\Controller;
 
+use App\Entity\InventaireConsommable;
 use App\Entity\InventaireEquipement;
 use App\Entity\UserEquipement;
 use App\Repository\EquipementCaracteristiqueRepository;
 use App\Repository\EquipementRepository;
+use App\Repository\InventaireConsommableRepository;
 use App\Repository\InventaireEquipementRepository;
+use App\Repository\InventaireObjetRepository;
 use App\Repository\InventaireRepository;
 use App\Repository\JoueurCaracteristiqueBonusRepository;
 use App\Repository\UserEquipementRepository;
@@ -26,13 +29,22 @@ class InventaireController extends AbstractController
     #[Route("/inventaire", name:"inventaire")]
     public function getPlayerInventaire(
         InventaireRepository                $inventaireRepository,
+        InventaireEquipementRepository      $inventaireEquipementRepository,
+        InventaireObjetRepository           $inventaireObjetRepository,
+        InventaireConsommableRepository     $inventaireConsommableRepository,
         EquipementCaracteristiqueRepository $equipementCaracteristiqueRepository
     ): Response {
 
         $userId = $this->getUser()->getId();
-        $equipements = $inventaireRepository->getPlayerEquipement($userId);
-        $objets = $inventaireRepository->getPlayerObjet($userId);
-        $consommables = $inventaireRepository->getPlayerConsommable($userId);
+        $inventaire = $inventaireRepository->findOneBy(['user' => $userId]);
+        $hasEquipement = !empty($inventaireEquipementRepository->findBy(["inventaire" => $inventaire]));
+        $equipements = $hasEquipement ? $inventaireRepository->getPlayerEquipement($userId) : [];
+
+        $hasObjet = !empty($inventaireObjetRepository->findBy(['inventaire' => $inventaire]));
+        $objets = $hasObjet ? $inventaireRepository->getPlayerObjet($userId) : [];
+
+        $hasConsommable = !empty($inventaireConsommableRepository->findBy(['inventaire' => $inventaire]));
+        $consommables = $hasConsommable ? $inventaireRepository->getPlayerConsommable($userId) : [];
 
         foreach ($equipements as &$equipement){
             $caracterisitques = $equipementCaracteristiqueRepository->getAllCaracteristiquesByIdEquipement($equipement['idEquipement']);

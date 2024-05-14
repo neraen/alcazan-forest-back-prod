@@ -182,13 +182,13 @@ class QuestService
 
         if($recompenseEntity->getConsommable()){
             $idConsommable = $recompenseEntity->getConsommable()->getId();
-            $this->inventaireService->addConsommableToUserInventaire($userId, $idConsommable, $quantity);
+            $this->inventaireService->addConsommableToUserInventaire($userId, $idConsommable, $recompenseEntity->getQuantity());
             $message .= "Vous recevez les potions {$recompenseEntity->getConsommable()->getNom()}";
         }
 
         if($recompenseEntity->getObjet()){
             $idObjet = $recompenseEntity->getObjet()->getId();
-            $this->inventaireService->addConsommableToUserInventaire($userId, $idObjet, $quantity);
+            $this->inventaireService->addConsommableToUserInventaire($userId, $idObjet, $recompenseEntity->getQuantity());
             $message .= "Vous recevez les potions {$recompenseEntity->getObjet()->getName()}";
         }
 

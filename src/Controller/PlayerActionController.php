@@ -277,19 +277,16 @@ class PlayerActionController extends AbstractController
     public function chooseAClass(
         Request                         $request,
         InventaireService               $inventaireService,
+        QuestService                    $questService,
         ClasseRepository                $classeRepository,
         UserRepository                  $userRepository,
         SequenceActionRepository        $sequenceActionRepository,
         EquipementRepository            $equipementRepository,
-        EventDispatcherInterface        $eventDispatcher
     ): Response {
         $data = json_decode($request->getContent(), true);
         $user = $this->getUser();
         $classeEntity = $classeRepository->findOneBy(['nom' => $data['classe']]);
         $userRepository->updateClasse($classeEntity->getId(), $this->getUser()->getId());
-        $sequenceId = $sequenceActionRepository->getSequenceByAction($data['actionId']);
-
-        $message = "La classe à bien été modifiée.<br />";
 
         /* todo : mettre en place des récompense "par action" dans les quêtes + utiliser les id */
         switch ($data['classe']){
@@ -309,8 +306,56 @@ class PlayerActionController extends AbstractController
 
         $inventaireService->addEquipementToUserInventaire($user->getId(), $equipement->getId());
 
-        $eventDispatcher->dispatch(new NextQuestSequenceEvent($user, $sequenceId));
-        $json = json_encode(['message' => $message]);
+        $userQuete = $questService->validateQuestAction($user, $data['sequenceId']);
+
+        if($userQuete->getSequence()->getHasAction()){
+            $actions = $sequenceActionRepository->getAllActionsBySequence($userQuete->getSequence()->getId());
+        }
+        $hasConditionalAction = $questService->checkSequenceHaveConditionalAction($actions);
+
+        $response = [
+            'title' => $userQuete->getQuete()->getName(),
+            'dialogue' => $userQuete->getSequence()->getDialogue()->getContenu() ?? '',
+            'actions' => $actions ?? [],
+            'sequenceId' => $userQuete->getSequence()->getId(),
+            'hasConditionalAction' => $hasConditionalAction,
+            'respectSequenceConditions' => true
+        ];
+
+        $json = json_encode($response);
+
+        return new Response($json);
+    }
+
+    #[Route("/user/choice/alignement", name:"user_choose_alignement")]
+    public function chooseAnAlignement(
+        Request                         $request,
+        QuestService                    $questService,
+        ClasseRepository                $classeRepository,
+        SequenceActionRepository        $sequenceActionRepository,
+    ): Response {
+        $data = json_decode($request->getContent(), true);
+        $user = $this->getUser();
+        $alignementEntity = $classeRepository->find('alignement');
+        $user->setAlignement($alignementEntity);
+
+        $userQuete = $questService->validateQuestAction($user, $data['sequenceId']);
+
+        if($userQuete->getSequence()->getHasAction()){
+            $actions = $sequenceActionRepository->getAllActionsBySequence($userQuete->getSequence()->getId());
+        }
+        $hasConditionalAction = $questService->checkSequenceHaveConditionalAction($actions);
+
+        $response = [
+            'title' => $userQuete->getQuete()->getName(),
+            'dialogue' => $userQuete->getSequence()->getDialogue()->getContenu() ?? '',
+            'actions' => $actions ?? [],
+            'sequenceId' => $userQuete->getSequence()->getId(),
+            'hasConditionalAction' => $hasConditionalAction,
+            'respectSequenceConditions' => true
+        ];
+
+        $json = json_encode($response);
 
         return new Response($json);
     }

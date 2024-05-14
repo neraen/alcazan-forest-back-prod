@@ -106,7 +106,7 @@ class ActionController extends AbstractController
 
             $response = [
                 'title' => $userQuete->getQuete()->getName(),
-                'dialogue' => $dialogue ?? '',
+                'dialogue' => $userQuete->getSequence()->getDialogue()->getContenu() ?? '',
                 'actions' => $actions ?? [],
                 'sequenceId' => $userQuete->getSequence()->getId(),
                 'hasConditionalAction' => $hasConditionalAction,
@@ -135,7 +135,6 @@ class ActionController extends AbstractController
 
         if($userLevel >= $action->getQuantity()){
             $userQuete = $questService->validateQuestAction($user, $data['sequenceId']);
-            $questService->validateQuestAction($user, $data['sequenceId']);
 
             if($userQuete->getSequence()->getHasAction()){
                 $actions = $sequenceActionRepository->getAllActionsBySequence($userQuete->getSequence()->getId());
@@ -143,7 +142,7 @@ class ActionController extends AbstractController
             $hasConditionalAction = $questService->checkSequenceHaveConditionalAction($actions);
             $response = [
                 'title' => $userQuete->getQuete()->getName(),
-                'dialogue' => $dialogue ?? '',
+                'dialogue' => $userQuete->getSequence()->getDialogue()->getContenu() ?? '',
                 'actions' => $actions ?? [],
                 'sequenceId' => $userQuete->getSequence()->getId(),
                 'hasConditionalAction' => $hasConditionalAction,

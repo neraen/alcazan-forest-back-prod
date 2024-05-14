@@ -19,7 +19,7 @@ class InventaireRepository extends ServiceEntityRepository
         parent::__construct($registry, Inventaire::class);
     }
 
-   public function getPlayerEquipement($userId){
+   public function getPlayerEquipement($userId): array {
        return $this->createQueryBuilder('inventaire')
            ->select(
                'equipement.id as idEquipement',
