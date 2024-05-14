@@ -38,7 +38,7 @@ class NiveauJoueurRepository extends ServiceEntityRepository
             ->getSingleScalarResult();
     }
 
-    public function addExperience($userId, $experience){
+    public function addExperience($userId, $experience): void {
         $this->createQueryBuilder('niveauJoueur')
             ->update(niveauJoueur::class, 'niveauJoueur')
             ->set('niveauJoueur.experience',':experience')

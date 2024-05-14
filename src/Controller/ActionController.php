@@ -26,6 +26,7 @@ class ActionController extends AbstractController
     #[Route("/passer/dialogue", name:"action_passer_dialogue")]
     public function actionPasserDialogue(
         Request $request,
+        QuestService $questService,
         SequenceRepository $sequenceRepository,
         SequenceActionRepository $sequenceActionRepository,
         UserQueteRepository $userQueteRepository,
@@ -47,23 +48,20 @@ class ActionController extends AbstractController
             }
 
             $dialogue = $nextSequence->getDialogue()->getContenu();
+            $questService->validateQuestAction($user, $data['sequenceId']);
+
             if($nextSequence->getHasAction()){
                 $actions = $sequenceActionRepository->getAllActionsBySequence($nextSequence->getId());
             }
-
-            $hasConditionalAction = false;
-            foreach ($actions as $action){
-                if(in_array($action['actionTypeId'], ConditionalAction::getValues())){
-                    $hasConditionalAction = true;
-                }
-            }
+            $hasConditionalAction = $questService->checkSequenceHaveConditionalAction($actions);
 
             $questData = [
                 'title' => $quete->getName(),
                 'dialogue' => $dialogue ?? '',
                 'actions' => $actions ?? [],
                 'sequenceId' => $nextSequence->getId(),
-                'hasConditionalAction' => $hasConditionalAction
+                'hasConditionalAction' => $hasConditionalAction,
+                'respectSequenceConditions' => true
             ];
 
             return new Response(json_encode($questData));
@@ -75,11 +73,12 @@ class ActionController extends AbstractController
     #[Route("/donner/objet", name:"action_donner_objet")]
     public function actionDonnerObjet(
         Request $request,
+        QuestService $questService,
         ActionRepository $actionRepository,
+        SequenceActionRepository $sequenceActionRepository,
         InventaireObjetRepository $inventaireObjetRepository,
         InventaireRepository $inventaireRepository,
-        EntityManagerInterface $entityManager,
-        EventDispatcherInterface $eventDispatcher
+        EntityManagerInterface $entityManager
     ): Response {
         $user = $this->getUser();
         $data = json_decode($request->getContent(), true);
@@ -96,10 +95,25 @@ class ActionController extends AbstractController
                 $entityManager->persist($inventaireObjet);
             }
             $entityManager->flush();
-            $response = "Success : Vous avez bien donné les objets demandés";
-            $eventDispatcher->dispatch(new NextQuestSequenceEvent($user, $data['sequenceId']));
+
+            $userQuete = $questService->validateQuestAction($user, $data['sequenceId']);
+            $questService->validateQuestAction($user, $data['sequenceId']);
+
+            if($userQuete->getSequence()->getHasAction()){
+                $actions = $sequenceActionRepository->getAllActionsBySequence($userQuete->getSequence()->getId());
+            }
+            $hasConditionalAction = $questService->checkSequenceHaveConditionalAction($actions);
+
+            $response = [
+                'title' => $userQuete->getQuete()->getName(),
+                'dialogue' => $dialogue ?? '',
+                'actions' => $actions ?? [],
+                'sequenceId' => $userQuete->getSequence()->getId(),
+                'hasConditionalAction' => $hasConditionalAction,
+                'respectSequenceConditions' => true
+            ];
         }else{
-            $response = "Erreur : vous n'avez pas les objets nécéssaire pour réaliser l'action";
+            $response = ["Erreur" => "vous n'avez pas les objets nécéssaire pour réaliser l'action"];
         }
 
 
@@ -109,6 +123,8 @@ class ActionController extends AbstractController
     #[Route("/atteindre/level", name:"action_atteindre_level")]
     public function actionAtteindreLevel(
         Request $request,
+        QuestService $questService,
+        SequenceActionRepository $sequenceActionRepository,
         ActionRepository $actionRepository,
         NiveauJoueurRepository $niveauJoueurRepository
     ): Response {
@@ -118,9 +134,23 @@ class ActionController extends AbstractController
         $userLevel = $niveauJoueurRepository->getPlayerLevel($user->getId());
 
         if($userLevel >= $action->getQuantity()){
-            $response = "Success : Vous avez bien le niveau nécéssaire pour réaliser l'action";
+            $userQuete = $questService->validateQuestAction($user, $data['sequenceId']);
+            $questService->validateQuestAction($user, $data['sequenceId']);
+
+            if($userQuete->getSequence()->getHasAction()){
+                $actions = $sequenceActionRepository->getAllActionsBySequence($userQuete->getSequence()->getId());
+            }
+            $hasConditionalAction = $questService->checkSequenceHaveConditionalAction($actions);
+            $response = [
+                'title' => $userQuete->getQuete()->getName(),
+                'dialogue' => $dialogue ?? '',
+                'actions' => $actions ?? [],
+                'sequenceId' => $userQuete->getSequence()->getId(),
+                'hasConditionalAction' => $hasConditionalAction,
+                'respectSequenceConditions' => true
+            ];
         }else{
-            $response = "Erreur : vous n'avez pas le niveau nécéssaire pour réaliser l'action";
+            $response = ["Erreur" => "vous n'avez pas le niveau nécéssaire pour réaliser l'action"];
         }
 
 

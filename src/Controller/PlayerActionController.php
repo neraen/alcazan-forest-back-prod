@@ -294,16 +294,16 @@ class PlayerActionController extends AbstractController
         /* todo : mettre en place des récompense "par action" dans les quêtes + utiliser les id */
         switch ($data['classe']){
             case Classe::ARCHER->value:
-                $equipement = $equipementRepository->findOneBy(['nom' => "Arc de l'archer débutant"]);
+                $equipement = $equipementRepository->findOneBy(['id' => 2]);
                 break;
             case Classe::SORCIER->value:
-                $equipement = $equipementRepository->findOneBy(['nom' => "Baton du sorcier débutant"]);
+                $equipement = $equipementRepository->findOneBy(['id' => 23]);
                 break;
             case Classe::GUERRIER->value:
-                $equipement = $equipementRepository->findOneBy(['nom' => "Epée du guerrier débutant"]);
+                $equipement = $equipementRepository->findOneBy(['id' => 22]);
                 break;
             case Classe::MOINE->value:
-                $equipement = $equipementRepository->findOneBy(['nom' => "Baton du moine débutant"]);
+                $equipement = $equipementRepository->findOneBy(['id' => 24]);
                 break;
         }
 

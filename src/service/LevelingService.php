@@ -21,16 +21,19 @@ class LevelingService
         $newExperienceScore = $levelData['experienceActuelle'] + $experience;
 
         if($newExperienceScore >= $levelData['experienceMax']){
-            $resteExperience = $newExperienceScore - $levelData['experienceMax'];
-            $newLevel = $levelData['niveau'] + 1;
-            $this->niveauJoueurRepository->addExperienceAndUpLevel($userId, $resteExperience, $newLevel);
+            $newExperienceScore = $newExperienceScore - $levelData['experienceMax'];
+            // todo : faire une constante
+            if($levelData['niveau'] < 200){
+                $newLevel = $levelData['niveau'] + 1;
+                $this->niveauJoueurRepository->addExperienceAndUpLevel($userId, $newExperienceScore, $newLevel);
+            }
+
         }else{
             $this->niveauJoueurRepository->addExperience($userId, $newExperienceScore);
         }
 
-        $newExperienceEntity = $this->niveauJoueurRepository->findOneBy(['user' => $userId]);
         return [
-            'experience' => $newExperienceEntity->getExperience(),
+            'experience' => $newExperienceScore,
             'level' => $newLevel ?? $levelData['niveau']
         ];
     }

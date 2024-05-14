@@ -8,7 +8,9 @@ use App\Entity\InventaireEquipement;
 use App\Entity\Quete;
 use App\Entity\Sequence;
 use App\Entity\User;
+use App\Entity\UserQuete;
 use App\Enum\ActionType;
+use App\Enum\ConditionalAction;
 use App\Repository\InventaireConsommableRepository;
 use App\Repository\InventaireEquipementRepository;
 use App\Repository\InventaireObjetRepository;
@@ -19,7 +21,6 @@ use App\Repository\SequenceActionRepository;
 use App\Repository\SequenceRepository;
 use App\Repository\UserQueteRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\HttpFoundation\Session\Session;
 
 class QuestService
 {
@@ -123,16 +124,42 @@ class QuestService
         return $niveauJoueur >= $action->getQuantity();
     }
 
-    public function setNextSequence(int $userId, int $sequenceId): void {
+    public function validateQuestAction(User $user, int $sequenceId): ?UserQuete {
+        $this->giveRecompenseToUser($user, $sequenceId);
+        $sequence = $this->sequenceRepository->find($sequenceId);
+        if($sequence->getIsLast()){
+            $this->setQuestDone($user, $sequence);
+            return null;
+        }else{
+            return $this->setNextSequence($user->getId(), $sequence->getId());
+        }
+    }
+
+    public function setNextSequence(int $userId, int $sequenceId): ?UserQuete {
         $actualSequence = $this->sequenceRepository->find($sequenceId);
         if(!$actualSequence->getIsLast()){
             $nextPosition = $actualSequence->getPosition() + 1;
             $nextSequence = $this->sequenceRepository->findOneBy(['position' => $nextPosition, 'quete' => $actualSequence->getQuete()]);
             $userQuete = $this->userQueteRepository->findOneBy(['user' => $userId, 'quete' => $actualSequence->getQuete()]);
             $userQuete->setSequence($nextSequence);
+
             $this->entityManager->persist($userQuete);
             $this->entityManager->flush();
+            return $userQuete;
         }
+        return null;
+    }
+
+    public function checkSequenceHaveConditionalAction(array $actions): bool {
+
+        $hasConditionalAction = false;
+        foreach ($actions as $action){
+            if(in_array($action['actionTypeId'], ConditionalAction::getValues())){
+                $hasConditionalAction = true;
+            }
+        }
+
+        return $hasConditionalAction;
     }
 
     public function setQuestDone(User $user, Sequence $sequence): void {
@@ -151,6 +178,18 @@ class QuestService
             $idEquipement = $recompenseEntity->getEquipement()->getId();
             $this->inventaireService->addEquipementToUserInventaire($userId, $idEquipement);
             $message .= "Vous recevez l'équipement {$recompenseEntity->getEquipement()->getNom()}";
+        }
+
+        if($recompenseEntity->getConsommable()){
+            $idConsommable = $recompenseEntity->getConsommable()->getId();
+            $this->inventaireService->addConsommableToUserInventaire($userId, $idConsommable, $quantity);
+            $message .= "Vous recevez les potions {$recompenseEntity->getConsommable()->getNom()}";
+        }
+
+        if($recompenseEntity->getObjet()){
+            $idObjet = $recompenseEntity->getObjet()->getId();
+            $this->inventaireService->addConsommableToUserInventaire($userId, $idObjet, $quantity);
+            $message .= "Vous recevez les potions {$recompenseEntity->getObjet()->getName()}";
         }
 
         $moneyRecompense = $recompenseEntity->getMoney();
