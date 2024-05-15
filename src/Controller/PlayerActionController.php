@@ -7,6 +7,7 @@ use App\Entity\InventaireEquipement;
 use App\Entity\JoueurGuilde;
 use App\Enum\Classe;
 use App\Event\NextQuestSequenceEvent;
+use App\Repository\AlignementRepository;
 use App\Repository\BossRecompenseRepository;
 use App\Repository\BossRepository;
 use App\Repository\ClasseRepository;
@@ -331,13 +332,16 @@ class PlayerActionController extends AbstractController
     public function chooseAnAlignement(
         Request                         $request,
         QuestService                    $questService,
-        ClasseRepository                $classeRepository,
+        AlignementRepository            $alignementRepository,
         SequenceActionRepository        $sequenceActionRepository,
+        EntityManagerInterface          $entityManager
     ): Response {
         $data = json_decode($request->getContent(), true);
         $user = $this->getUser();
-        $alignementEntity = $classeRepository->find('alignement');
+        $alignementEntity = $alignementRepository->find($data['alignement']);
         $user->setAlignement($alignementEntity);
+        $entityManager->persist($user);
+        $entityManager->flush();
 
         $userQuete = $questService->validateQuestAction($user, $data['sequenceId']);
 
