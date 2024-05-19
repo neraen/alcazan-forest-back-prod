@@ -186,6 +186,7 @@ class QuestService
             $message .= "Vous recevez les potions {$recompenseEntity->getConsommable()->getNom()}";
         }
 
+
         if($recompenseEntity->getObjet()){
             $idObjet = $recompenseEntity->getObjet()->getId();
             $this->inventaireService->addConsommableToUserInventaire($userId, $idObjet, $recompenseEntity->getQuantity());
