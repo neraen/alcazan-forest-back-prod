@@ -92,6 +92,7 @@ class InventaireService
             $inventaireObjetEntity->setInventaire($inventaireEntity);
             $this->entityManager->persist($inventaireObjetEntity);
             $this->entityManager->flush();
+
         }
     }
 
