@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route("/api", name:"api_")]
-class ConsommableControlleur extends AbstractController{
+class ConsommableControlleur extends AbstractController {
 
     public function __construct(){}
 

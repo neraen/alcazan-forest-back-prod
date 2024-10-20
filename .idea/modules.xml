@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/alcazan-back-prod.iml" filepath="$PROJECT_DIR$/.idea/alcazan-back-prod.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../alcazan-front-prod/.idea/alcazan-front-prod.iml" filepath="$PROJECT_DIR$/../alcazan-front-prod/.idea/alcazan-front-prod.iml" />
     </modules>
   </component>
 </project>
