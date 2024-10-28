@@ -1,8 +1,6 @@
 <?php
 
-
 namespace App\service;
-
 
 use App\Entity\Boss;
 use App\Entity\Buff;
@@ -17,62 +15,32 @@ use App\Repository\BuffCaracteristiqueRepository;
 use App\Repository\JoueurCaracteristiqueBonusRepository;
 use App\Repository\JoueurCaracteristiqueRepository;
 use App\Repository\NiveauJoueurRepository;
-use App\Repository\SortilegeRepository;
 use App\Repository\UserBossRepository;
 use App\Repository\UserBuffRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Security\Core\Security;
+
 
 class SpellService
 {
-    public $deathService;
-
-    private $caracteristiqueService;
-    public $joueurCaracteristiqueRepository;
-    public $joueurCaracteristiqueBonusRepository;
-    public $niveauJoueurRepository;
-    public $security;
-    public $userRepository;
-    public $bossRepository;
-    public $userBossRepository;
-    public $userBuffRepository;
-    public $buffCaracteristiqueRepository;
-    public $entityManager;
-
     const DAMAGE_BALANCING_CONSTANT = 400;
     const MAX_ARMOR_REDUCTION = 0.4;
     const BASE_ARMOR_COEF = 2.2;
 
     public function __construct(
-        DeathService $deathService,
-        CaracteristiqueService $caracteristiqueService,
-        JoueurCaracteristiqueRepository $joueurCaracteristiqueRepository,
-        JoueurCaracteristiqueBonusRepository $joueurCaracteristiqueBonusRepository,
-        NiveauJoueurRepository $niveauJoueurRepository,
-        Security $security,
-        UserRepository $userRepository,
-        BossRepository $bossRepository,
-        BossSortilegeRepository $bossSortilegeRepository,
-        UserBossRepository $userBossRepository,
-        UserBuffRepository $userBuffRepository,
-        BuffCaracteristiqueRepository $buffCaracteristiqueRepository,
-        EntityManagerInterface $entityManager
-    )
-    {
-        $this->deathService = $deathService;
-        $this->caracteristiqueService = $caracteristiqueService;
-        $this->joueurCaracteristiqueRepository = $joueurCaracteristiqueRepository;
-        $this->joueurCaracteristiqueBonusRepository = $joueurCaracteristiqueBonusRepository;
-        $this->niveauJoueurRepository = $niveauJoueurRepository;
-        $this->security = $security;
-        $this->userRepository = $userRepository;
-        $this->bossRepository = $bossRepository;
-        $this->bossSortilegeRepository = $bossSortilegeRepository;
-        $this->userBossRepository = $userBossRepository;
-        $this->userBuffRepository = $userBuffRepository;
-        $this->buffCaracteristiqueRepository = $buffCaracteristiqueRepository;
-        $this->entityManager = $entityManager;
+        private DeathService $deathService,
+        private CaracteristiqueService $caracteristiqueService,
+        private JoueurCaracteristiqueRepository $joueurCaracteristiqueRepository,
+        private JoueurCaracteristiqueBonusRepository $joueurCaracteristiqueBonusRepository,
+        private NiveauJoueurRepository $niveauJoueurRepository,
+        private UserRepository $userRepository,
+        private BossRepository $bossRepository,
+        private BossSortilegeRepository $bossSortilegeRepository,
+        private UserBossRepository $userBossRepository,
+        private UserBuffRepository $userBuffRepository,
+        private BuffCaracteristiqueRepository $buffCaracteristiqueRepository,
+        private EntityManagerInterface $entityManager
+    ){
     }
 
     public function egal1(){

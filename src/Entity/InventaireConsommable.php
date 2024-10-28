@@ -5,33 +5,23 @@ namespace App\Entity;
 use App\Repository\InventaireConsommableRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=InventaireConsommableRepository::class)
- */
+#[ORM\Entity(repositoryClass: InventaireConsommableRepository::class)]
 class InventaireConsommable
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Inventaire::class, inversedBy="inventaireConsommables")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Inventaire::class, inversedBy: 'inventaireConsommables')]
     private $inventaire;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Consommable::class, inversedBy="no")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Consommable::class, inversedBy: 'no')]
     private $consommable;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $quantity;
 
     public function getId(): ?int

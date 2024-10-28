@@ -2,47 +2,32 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\CarreauRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 
-/**
- * @ORM\Entity(repositoryClass=CarreauRepository::class)
- */
+#[ORM\Entity(repositoryClass: CarreauRepository::class)]
 class Carreau
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     * @Groups({"carte_read"})
-     */
+
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     * @Groups({"carte_read"})
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $type;
 
-    /**
-     * @ORM\Column(type="boolean")
-     * @Groups({"carte_read"})
-     */
+    #[ORM\Column(type: 'boolean')]
     private $isWrap;
 
-    /**
-     * @ORM\Column(type="boolean")
-     * @Groups({"carte_read"})
-     */
+
+    #[ORM\Column(type: 'boolean')]
     private $isUsable;
 
-    /**
-     * @ORM\OneToMany(targetEntity=CarteCarreau::class, mappedBy="carreau")
-     */
+    #[ORM\OneToMany(mappedBy: 'carreau', targetEntity: CarteCarreau::class)]
     private $carteCarreaux;
 
 

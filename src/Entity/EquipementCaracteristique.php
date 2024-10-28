@@ -5,33 +5,23 @@ namespace App\Entity;
 use App\Repository\EquipementCaracteristiqueRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=EquipementCaracteristiqueRepository::class)
- */
+#[ORM\Entity(repositoryClass: EquipementCaracteristiqueRepository::class)]
 class EquipementCaracteristique
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Equipement::class, inversedBy="equipementCaracteristiques")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Equipement::class, inversedBy: 'equipementCaracteristiques')]
     private $equipement;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Caracteristique::class, inversedBy="equipementCaracteristiques")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Caracteristique::class, inversedBy: 'equipementCaracteristiques')]
     private $caracteristique;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $valeur;
 
     public function getId(): ?int

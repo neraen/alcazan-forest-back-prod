@@ -10,26 +10,12 @@ use App\Repository\ShopRepository;
 
 class PnjService {
 
-    private $shopRepository;
-
-    private $shopService;
-
-    private $shopEquipementRepository;
-
-    private $equipementCaracteristiqueRepository;
-
     public function __construct(
-        ShopRepository $shopRepository,
-        ShopEquipementRepository $shopEquipementRepository,
-        ShopObjetRepository $shopObjetRepository,
-        EquipementCaracteristiqueRepository $equipementCaracteristiqueRepository,
-        ShopService $shopService)
-    {
-        $this->shopRepository = $shopRepository;
-        $this->shopEquipementRepository = $shopEquipementRepository;
-        $this->shopObjetRepository = $shopObjetRepository;
-        $this->equipementCaracteristiqueRepository = $equipementCaracteristiqueRepository;
-        $this->shopService = $shopService;
+        private ShopRepository $shopRepository,
+        private ShopEquipementRepository $shopEquipementRepository,
+        private ShopObjetRepository $shopObjetRepository,
+        private EquipementCaracteristiqueRepository $equipementCaracteristiqueRepository,
+    ){
     }
 
     public function getPnjShop(Pnj $pnj): array{

@@ -2,37 +2,24 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
-use App\Controller\JoueurCaracteristiqueController;
-use App\Controller\UpdateJoueurCaracteristiqueController;
 use App\Repository\JoueurCaracteristiqueRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=JoueurCaracteristiqueRepository::class)
- */
+#[ORM\Entity(repositoryClass: JoueurCaracteristiqueRepository::class)]
 class JoueurCaracteristique
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="joueurCaracteristiques")
-     */
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'joueurCaracteristiques')]
     private $user;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Caracteristique::class, inversedBy="joueurCaracteristiques")
-     */
+    #[ORM\ManyToOne(targetEntity: Caracteristique::class, inversedBy: 'joueurCaracteristiques')]
     private $caracteristique;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $points;
 
     public function getId(): ?int

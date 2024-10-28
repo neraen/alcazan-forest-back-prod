@@ -8,13 +8,7 @@ use App\Repository\NiveauJoueurRepository;
 
 class LevelingService
 {
-
-    private $niveauJoueurRepository;
-
-    public function __construct(NiveauJoueurRepository $niveauJoueurRepository)
-    {
-        $this->niveauJoueurRepository = $niveauJoueurRepository;
-    }
+    public function __construct(private NiveauJoueurRepository $niveauJoueurRepository){}
 
     public function giveExperienceToAPlayer(int $experience, int $userId): array{
         $levelData = $this->niveauJoueurRepository->getNiveauAndExperience($userId);

@@ -2,74 +2,48 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\GuildeRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Annotation\Groups;
 
-/**
- * @ORM\Entity(repositoryClass=GuildeRepository::class)
- */
+
+#[ORM\Entity(repositoryClass: GuildeRepository::class)]
 class Guilde
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $nom;
 
-    /**
-     * @ORM\Column(type="text", nullable=true)
-     */
+    #[ORM\Column(type: 'text', nullable: true)]
     private $description;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $placeMax;
 
-    /**
-     * @ORM\OneToMany(targetEntity=User::class, mappedBy="guilde")
-     */
+    #[ORM\OneToMany(mappedBy: 'guilde', targetEntity: User::class)]
     private $users;
 
-    /**
-     * @ORM\OneToMany(targetEntity=JoueurGuilde::class, mappedBy="guilde")
-     */
+    #[ORM\OneToMany(mappedBy: 'guilde', targetEntity: JoueurGuilde::class)]
     private $joueurGuildes;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Alignement::class, inversedBy="guildes")
-     */
+    #[ORM\ManyToOne(targetEntity: Alignement::class, inversedBy: 'guildes')]
     private $alignement;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $niveau;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $icone;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $banner;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $nbJoueurMax;
 
     public function __construct()

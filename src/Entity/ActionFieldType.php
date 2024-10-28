@@ -5,27 +5,19 @@ namespace App\Entity;
 use App\Repository\ActionFieldTypeRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=ActionFieldTypeRepository::class)
- */
+#[ORM\Entity(repositoryClass: ActionFieldTypeRepository::class)]
 class ActionFieldType
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=ActionField::class, inversedBy="actionFieldTypes")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: ActionField::class, inversedBy: 'actionFieldTypes')]
     private $actionField;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=ActionType::class, inversedBy="actionFieldTypes")
-     */
+    #[ORM\ManyToOne(targetEntity: ActionType::class, inversedBy: 'actionFieldTypes')]
     private $actionType;
 
     public function getId(): ?int

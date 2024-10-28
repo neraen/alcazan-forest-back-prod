@@ -8,103 +8,62 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 
-/**
- * @ORM\Entity(repositoryClass=SortilegeRepository::class)
- */
+#[ORM\Entity(repositoryClass: SortilegeRepository::class)]
 class Sortilege
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $nom;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Classe::class, inversedBy="sortileges")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Classe::class, inversedBy: 'sortileges')]
     private $classe;
 
-    /**
-     * @ORM\Column(type="float")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: 'float')]
     private $cooldown;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: 'integer')]
     private $degatBase;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $icone;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: 'integer')]
     private $niveau;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $portee;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $caracteristiqueDegat;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $caracteristiqueEquilibre;
 
-    /**
-     * @ORM\Column(type="float")
-     */
+    #[ORM\Column(type: 'float')]
     private $coefPrincipal;
 
-    /**
-     * @ORM\Column(type="float")
-     */
+    #[ORM\Column(type: 'float')]
     private $coefSecondaire;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $type;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $pointAction;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Buff::class, inversedBy="sortileges")
-     */
+    #[ORM\ManyToOne(targetEntity: Buff::class, inversedBy: 'sortileges')]
     private $buff;
 
-    /**
-     * @ORM\Column(type="text", nullable=true)
-     */
+    #[ORM\Column(type: 'text', nullable: true)]
     private $description;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserSortilege::class, mappedBy="sortilege")
-     */
+    #[ORM\OneToMany(mappedBy: 'sortilege', targetEntity: UserSortilege::class)]
     private $userSortileges;
 
     public function __construct()

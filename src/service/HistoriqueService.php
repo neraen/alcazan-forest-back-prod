@@ -4,18 +4,12 @@ namespace App\service;
 
 use App\Entity\Historique;
 use App\Entity\User;
-use App\Repository\HistoriqueRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 class HistoriqueService{
 
-    private $historiqueRepository;
-    private $entityManager;
-
-    public function __construct(HistoriqueRepository $historiqueRepository, EntityManagerInterface $entityManager)
+    public function __construct(private EntityManagerInterface $entityManager)
     {
-        $this->historiqueRepository = $historiqueRepository;
-        $this->entityManager = $entityManager;
     }
 
     public function recordInHistoryPlayer(User $user, string $message, bool $isExternal): void{

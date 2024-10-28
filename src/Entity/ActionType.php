@@ -7,36 +7,24 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=ActionTypeRepository::class)
- */
+#[ORM\Entity(repositoryClass: ActionTypeRepository::class)]
 class ActionType
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    /**
-     * @ORM\OneToMany(targetEntity=ActionFieldType::class, mappedBy="ActionType")
-     */
+    #[ORM\OneToMany(mappedBy: 'ActionType', targetEntity: ActionFieldType::class)]
     private $actionFieldTypes;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $isRecursive;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Action::class, mappedBy="actionType")
-     */
+    #[ORM\OneToMany(mappedBy: 'actionType', targetEntity: Action::class)]
     private $actions;
 
     public function __construct()

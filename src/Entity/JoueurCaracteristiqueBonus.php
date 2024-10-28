@@ -5,33 +5,23 @@ namespace App\Entity;
 use App\Repository\JoueurCaracteristiqueBonusRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=JoueurCaracteristiqueBonusRepository::class)
- */
+#[ORM\Entity(repositoryClass: JoueurCaracteristiqueBonusRepository::class)]
 class JoueurCaracteristiqueBonus
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="joueurCaracteristiqueBonuses")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'joueurCaracteristiqueBonuses')]
     private $joueur;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Caracteristique::class, inversedBy="joueurCaracteristiqueBonuses")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Caracteristique::class, inversedBy: 'joueurCaracteristiqueBonuses')]
     private $caracteristique;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $points;
 
     public function getId(): ?int

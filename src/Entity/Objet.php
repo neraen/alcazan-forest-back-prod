@@ -2,73 +2,48 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
+
 use App\Repository\ObjetRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=ObjetRepository::class)
- */
-#[ApiResource]
+#[ORM\Entity(repositoryClass: ObjetRepository::class)]
 class Objet
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    /**
-     * @ORM\Column(type="string", length=2000, nullable=true)
-     */
+    #[ORM\Column(type: 'string', length: 2000, nullable: true)]
     private $description;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $prix_vente;
 
-    /**
-     * @ORM\OneToMany(targetEntity=MonstreObjet::class, mappedBy="objet")
-     */
+    #[ORM\OneToMany(mappedBy: 'objet', targetEntity: MonstreObjet::class)]
     private $objets;
 
-    /**
-     * @ORM\OneToMany(targetEntity=ShopObjet::class, mappedBy="objet")
-     */
+    #[ORM\OneToMany(mappedBy: 'objet', targetEntity: ShopObjet::class)]
     private $shopObjets;
 
-    /**
-     * @ORM\OneToMany(targetEntity=InventaireObjet::class, mappedBy="objet")
-     */
+    #[ORM\OneToMany(mappedBy: 'objet', targetEntity: InventaireObjet::class)]
     private $inventaireObjets;
 
-    /**
-     * @ORM\Column(type="string", length=255, nullable=true)
-     */
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private $image;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Recompense::class, mappedBy="objet")
-     */
+    #[ORM\OneToMany(mappedBy: 'objet', targetEntity: Recompense::class)]
     private $recompenses;
 
-    /**
-     * @ORM\OneToMany(targetEntity=BossObjet::class, mappedBy="objet")
-     */
+    #[ORM\OneToMany(mappedBy: 'objet', targetEntity: BossObjet::class)]
     private $bossObjets;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Action::class, mappedBy="objet")
-     */
+    #[ORM\OneToMany(mappedBy: 'objet', targetEntity: Action::class)]
     private $actions;
 
     public function __construct()

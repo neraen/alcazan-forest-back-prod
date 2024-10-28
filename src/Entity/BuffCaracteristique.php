@@ -5,33 +5,23 @@ namespace App\Entity;
 use App\Repository\BuffCaracteristiqueRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=BuffCaracteristiqueRepository::class)
- */
+#[ORM\Entity(repositoryClass: BuffCaracteristiqueRepository::class)]
 class BuffCaracteristique
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Buff::class, inversedBy="buffCaracteristiques")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Buff::class, inversedBy: 'buffCaracteristiques')]
     private $buff;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Caracteristique::class, inversedBy="buffCaracteristiques")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Caracteristique::class, inversedBy: 'buffCaracteristiques')]
     private $caracteristique;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $value;
 
     public function getId(): ?int

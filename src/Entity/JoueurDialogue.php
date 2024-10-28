@@ -5,28 +5,20 @@ namespace App\Entity;
 use App\Repository\JoueurDialogueRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=JoueurDialogueRepository::class)
- */
+#[ORM\Entity(repositoryClass: JoueurDialogueRepository::class)]
 class JoueurDialogue
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="joueurDialogues")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'joueurDialogues')]
     private $joueur;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Dialogue::class, inversedBy="joueurDialogues")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Dialogue::class, inversedBy: 'joueurDialogues')]
     private $dialogue;
 
     public function getId(): ?int

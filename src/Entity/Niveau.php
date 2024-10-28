@@ -6,36 +6,23 @@ use App\Repository\NiveauRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Annotation\Groups;
 
-/**
- * @ORM\Entity(repositoryClass=NiveauRepository::class)
- */
+#[ORM\Entity(repositoryClass: NiveauRepository::class)]
 class Niveau
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: 'integer')]
     private $niveau;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+
+    #[ORM\Column(type: 'integer')]
     private $experience;
 
-    /**
-     * @ORM\OneToMany(targetEntity=NiveauJoueur::class, mappedBy="niveau")
-     *  @Groups({"users_read"})
-     */
+    #[ORM\OneToMany(mappedBy: 'niveau', targetEntity: NiveauJoueur::class)]
     private $niveauJoueurs;
 
     public function __construct()

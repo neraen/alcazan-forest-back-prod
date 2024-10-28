@@ -2,68 +2,44 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\MonstreRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=MonstreRepository::class)
- */
-#[ApiResource]
+#[ORM\Entity(repositoryClass: MonstreRepository::class)]
 class Monstre
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $maxLife;
 
-    /**
-     * @ORM\OneToOne(targetEntity=CarteCarreau::class, inversedBy="monstres", cascade={"persist", "remove"})
-     */
+    #[ORM\OneToOne(inversedBy: 'monstres', targetEntity: CarteCarreau::class, cascade: ['persist', 'remove'])]
     private $carteCarreau;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $temps_repop;
 
-    /**
-     * @ORM\OneToMany(targetEntity=MonstreCarreau::class, mappedBy="monstre")
-     */
+    #[ORM\OneToMany(mappedBy: 'monstre', targetEntity: MonstreCarreau::class)]
     private $case;
 
-    /**
-     * @ORM\OneToMany(targetEntity=MonstreObjet::class, mappedBy="monstre")
-     */
+    #[ORM\OneToMany(mappedBy: 'monstre', targetEntity: MonstreObjet::class)]
     private $monstreObjets;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $skin;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $puissance;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Action::class, mappedBy="monstre")
-     */
+    #[ORM\OneToMany(mappedBy: 'monstre', targetEntity: Action::class)]
     private $actions;
 
     public function __construct()

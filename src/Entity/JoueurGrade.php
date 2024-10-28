@@ -5,27 +5,19 @@ namespace App\Entity;
 use App\Repository\JoueurGradeRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=JoueurGradeRepository::class)
- */
+#[ORM\Entity(repositoryClass: JoueurGradeRepository::class)]
 class JoueurGrade
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="joueurGrades")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'joueurGrades')]
     private $user;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Grade::class, inversedBy="joueurGrades")
-     */
+    #[ORM\ManyToOne(targetEntity: Grade::class, inversedBy: 'joueurGrades')]
     private $grade;
 
     public function getId(): ?int

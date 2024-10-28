@@ -5,28 +5,20 @@ namespace App\Entity;
 use App\Repository\ShopObjetRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=ShopObjetRepository::class)
- */
+#[ORM\Entity(repositoryClass: ShopObjetRepository::class)]
 class ShopObjet
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Shop::class, inversedBy="shopObjets")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Shop::class, inversedBy: 'shopObjets')]
     private $shop;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Objet::class, inversedBy="shopObjets")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Objet::class, inversedBy: 'shopObjets')]
     private $objet;
 
     public function getId(): ?int

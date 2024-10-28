@@ -2,80 +2,51 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\CarteRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 
-/**
- * @ORM\Entity(repositoryClass=CarteRepository::class)
-*/
+#[ORM\Entity(repositoryClass: CarteRepository::class)]
 class Carte
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     * @Groups({"carte_read", "users_read"})
-     *
-     */
+
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     * @Groups({"carte_read"})
-     */
+
+    #[ORM\Column(type: 'string', length: 255)]
     private $nom;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     * @ORM\Column(type="json")
-     * @Groups({"carte_read"})
-     */
+
+    #[ORM\Column(type: 'json')]
     private $position;
 
-    /**
-     * @ORM\OneToMany(targetEntity=CarteCarreau::class, mappedBy="carte")
-     * @Groups({"carte_read"})
-     */
+    #[ORM\OneToMany(mappedBy: 'carte', targetEntity: CarteCarreau::class)]
     private $carteCarreaux;
 
-    /**
-     * @ORM\OneToMany(targetEntity=User::class, mappedBy="map")
-     * @Groups({"carte_read"})
-     */
+    #[ORM\OneToMany(mappedBy: 'map', targetEntity: User::class)]
     private $users;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $abscisse;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $ordonnee;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $isInstance;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $is_cimetiere;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $is_auberge;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Action::class, mappedBy="carte")
-     */
+    #[ORM\OneToMany(mappedBy: 'carte', targetEntity: Action::class)]
     private $actions;
 
 

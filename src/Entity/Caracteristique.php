@@ -7,41 +7,27 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=CaracteristiqueRepository::class)
- */
+#[ORM\Entity(repositoryClass: CaracteristiqueRepository::class)]
 class Caracteristique
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $nom;
 
-    /**
-     * @ORM\OneToMany(targetEntity=JoueurCaracteristique::class, mappedBy="caracteristique")
-     */
+    #[ORM\OneToMany(mappedBy: 'caracteristique', targetEntity: JoueurCaracteristique::class)]
     private $joueurCaracteristiques;
 
-    /**
-     * @ORM\OneToMany(targetEntity=EquipementCaracteristique::class, mappedBy="caracteristique")
-     */
+    #[ORM\OneToMany(mappedBy: 'caracteristique', targetEntity: EquipementCaracteristique::class)]
     private $equipementCaracteristiques;
 
-    /**
-     * @ORM\OneToMany(targetEntity=JoueurCaracteristiqueBonus::class, mappedBy="Caracteristique")
-     */
+    #[ORM\OneToMany(mappedBy: 'Caracteristique', targetEntity: JoueurCaracteristiqueBonus::class)]
     private $joueurCaracteristiqueBonuses;
 
-    /**
-     * @ORM\OneToMany(targetEntity=BuffCaracteristique::class, mappedBy="Caracteristique")
-     */
+    #[ORM\OneToMany(mappedBy: 'Caracteristique', targetEntity: BuffCaracteristique::class)]
     private $buffCaracteristiques;
 
     public function __construct()

@@ -7,56 +7,36 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=QueteRepository::class)
- */
+#[ORM\Entity(repositoryClass: QueteRepository::class)]
 class Quete
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserQuete::class, mappedBy="quete")
-     */
+    #[ORM\OneToMany(mappedBy: 'quete', targetEntity: UserQuete::class)]
     private $userQuetes;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Sequence::class, mappedBy="quete")
-     */
+    #[ORM\OneToMany(mappedBy: 'quete', targetEntity: Sequence::class)]
     private $sequences;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Pnj::class, mappedBy="quete")
-     */
+    #[ORM\OneToMany(mappedBy: 'quete', targetEntity: Pnj::class)]
     private $pnjs;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $minimalLevel;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Alignement::class, inversedBy="quetes")
-     */
+    #[ORM\ManyToOne(targetEntity: Alignement::class, inversedBy: 'quetes')]
     private $alignement;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Quete::class)
-     */
+    #[ORM\ManyToOne(targetEntity: Quete::class)]
     private $quete;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Objet::class)
-     */
+    #[ORM\ManyToOne(targetEntity: Objet::class)]
     private $objet;
 
 

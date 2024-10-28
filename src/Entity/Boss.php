@@ -7,76 +7,48 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=BossRepository::class)
- */
+#[ORM\Entity(repositoryClass: BossRepository::class)]
 class Boss
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $maxLife;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $actualLife;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $puissance;
 
-    /**
-     * @ORM\OneToMany(targetEntity=BossEquipement::class, mappedBy="boss")
-     */
+    #[ORM\OneToMany(mappedBy: 'boss', targetEntity: BossEquipement::class)]
     private $bossEquipements;
 
-    /**
-     * @ORM\OneToMany(targetEntity=BossObjet::class, mappedBy="boss")
-     */
+    #[ORM\OneToMany(mappedBy: 'boss', targetEntity: BossObjet::class)]
     private $bossObjets;
 
-    /**
-     * @ORM\OneToMany(targetEntity=BossSortilege::class, mappedBy="boss")
-     */
+    #[ORM\OneToMany(mappedBy: 'boss', targetEntity: BossSortilege::class)]
     private $bossSortileges;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $icone;
 
-    /**
-     * @ORM\OneToMany(targetEntity=CarteCarreau::class, mappedBy="boss")
-     */
+    #[ORM\OneToMany(mappedBy: 'boss', targetEntity: CarteCarreau::class)]
     private $carteCarreaus;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserBoss::class, mappedBy="boss")
-     */
+    #[ORM\OneToMany(mappedBy: 'boss', targetEntity: UserBoss::class)]
     private $userBosses;
 
-    /**
-     * @ORM\OneToMany(targetEntity=BossRecompense::class, mappedBy="boss")
-     */
+    #[ORM\OneToMany(mappedBy: 'boss', targetEntity: BossRecompense::class)]
     private $bossRecompenses;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Action::class, mappedBy="boss")
-     */
+    #[ORM\OneToMany(mappedBy: 'boss', targetEntity: Action::class)]
     private $actions;
 
     public function __construct()

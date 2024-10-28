@@ -2,293 +2,166 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Serializer\Annotation\Groups;
 
-/**
- * @ORM\Entity(repositoryClass=UserRepository::class)
- * @ApiResource(
- *     normalizationContext={"groups"={"users_read"}},
- *     denormalizationContext={"disable_type_enforcement"=true}
- * )
- * @UniqueEntity("email", message="Un utilisateur possède déjà cet email")
- */
-class User implements UserInterface
+
+#[ORM\Entity(repositoryClass: UserRepository::class)]
+#[UniqueEntity(fields: ["email"], message: "Un utilisateur possède déjà cet email")]
+class User implements PasswordAuthenticatedUserInterface, UserInterface
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: "integer")]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=180, unique=true)
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "string", length: 180, unique: true)]
     private $email;
 
-    /**
-     * @ORM\Column(type="json")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "json")]
     private array $roles = [];
 
-    /**
-     * @var string The hashed password
-     * @ORM\Column(type="string")
-     */
+    #[ORM\Column(type: "string")]
     private $password;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\Column(type: "string", length: 255)]
     private $pseudo;
 
-    /**
-     * @ORM\Column(type="boolean")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "boolean")]
     private $isActive;
 
-    /**
-     * @ORM\Column(type="string", length=255, nullable=true)
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "string", length: 255, nullable: true)]
     private $numero;
 
-    /**
-     * @ORM\Column(type="text", nullable=true)
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "text", nullable: true)]
     private $description;
 
-    /**
-     * @ORM\OneToMany(targetEntity=JoueurCaracteristique::class, mappedBy="user")
-     * @Groups({"users_read"})
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: JoueurCaracteristique::class)]
     private $joueurCaracteristiques;
 
-    /**
-     * @ORM\OneToMany(targetEntity=NiveauJoueur::class, mappedBy="user")
-     * @Groups({"users_read"})
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: NiveauJoueur::class)]
     private $niveauJoueur;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Guilde::class, inversedBy="users")
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\ManyToOne(targetEntity: Guilde::class, inversedBy: "users")]
     private $guilde;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Alignement::class, inversedBy="users")
-     * @Groups({"users_read"})
-     */
+    #[ORM\ManyToOne(targetEntity: Alignement::class, inversedBy: "users")]
     private $alignement;
 
-    /**
-     * @ORM\Column(type="datetime")
-     */
+    #[ORM\Column(type: "datetime")]
     private $created;
 
-    /**
-     * @ORM\Column(type="datetime", nullable=true)
-     */
+    #[ORM\Column(type: "datetime", nullable: true)]
     private $updated;
 
-    /**
-     * @ORM\Column(type="datetime", nullable=true)
-     */
+    #[ORM\Column(type: "datetime", nullable: true)]
     private $lastConnexion;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Classe::class, inversedBy="users", cascade={"persist"})
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\ManyToOne(targetEntity: Classe::class, cascade: ["persist"], inversedBy: "users")]
     private $classe;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\Column(type: "integer")]
     private $currentLife;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\Column(type: "integer")]
     private $maxLife;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "integer")]
     private $money;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "integer")]
     private $actionPoint;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "integer")]
     private $mouvementPoint;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "integer")]
     private $currentMana;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read"})
-     */
+    #[ORM\Column(type: "integer")]
     private $maxMana;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Carte::class, inversedBy="users")
-     * @Groups({"users_read"})
-     */
+    #[ORM\ManyToOne(targetEntity: Carte::class, inversedBy: "users")]
     private $map;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\Column(type: "integer")]
     private $caseOrdonnee;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\Column(type: "integer")]
     private $caseAbscisse;
 
-    /**
-     * @ORM\OneToOne(targetEntity=CarteCarreau::class, mappedBy="joueur", cascade={"persist", "remove"})
-     */
+    #[ORM\OneToOne(targetEntity: CarteCarreau::class, mappedBy: "joueur", cascade: ["persist", "remove"])]
     private $carteCarreau;
 
-    /**
-     * @ORM\OneToMany(targetEntity=JoueurDialogue::class, mappedBy="joueur")
-     */
+    #[ORM\OneToMany(targetEntity: JoueurDialogue::class, mappedBy: "joueur")]
     private $joueurDialogues;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserSequence::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(targetEntity: UserSequence::class, mappedBy: "user")]
     private $userSequences;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserQuete::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(targetEntity: UserQuete::class, mappedBy: "user")]
     private $userQuetes;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: "string", length: 255)]
     private $sexe;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: "integer")]
     private $maxPointCarac;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: "integer")]
     private $actualPointCarac;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: "integer")]
     private $restePointCarac;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserEquipement::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: UserEquipement::class)]
     private $userEquipements;
 
-    /**
-     * @ORM\OneToMany(targetEntity=JoueurCaracteristiqueBonus::class, mappedBy="joueur")
-     */
+    #[ORM\OneToMany(mappedBy: "joueur", targetEntity: JoueurCaracteristiqueBonus::class)]
     private $joueurCaracteristiqueBonuses;
 
-    /**
-     * @ORM\Column(type="datetime", nullable=true)
-     */
+    #[ORM\Column(type: "datetime", nullable: true)]
     private $summoningSickness;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: "integer", nullable: true)]
     private $honneur;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserConsommable::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: UserConsommable::class)]
     private $userConsommables;
 
-    /**
-     * @ORM\Column(type="datetime", nullable=true)
-     */
+    #[ORM\Column(type: "datetime", nullable: true)]
     private $time_auberge;
 
-    /**
-     * @ORM\OneToMany(targetEntity=JoueurGuilde::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: JoueurGuilde::class)]
     private $joueurGuildes;
 
-    /**
-     * @ORM\OneToMany(targetEntity=JoueurGrade::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: JoueurGrade::class)]
     private $joueurGrades;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Message::class, mappedBy="expediteur")
-     */
+    #[ORM\OneToMany(mappedBy: "expediteur", targetEntity: Message::class)]
     private $messages;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserBoss::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: UserBoss::class)]
     private $userBosses;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Historique::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: Historique::class)]
     private $historiques;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserBuff::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: UserBuff::class)]
     private $userBuffs;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Friend::class, mappedBy="user1")
-     */
+    #[ORM\OneToMany(mappedBy: "user1", targetEntity: Friend::class)]
     private $friends;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserSortilege::class, mappedBy="user")
-     */
+    #[ORM\OneToMany(mappedBy: "user", targetEntity: UserSortilege::class)]
     private $userSortileges;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: "boolean")]
     private $tutorialActive;
 
     public function __construct()
@@ -385,7 +258,7 @@ class User implements UserInterface
     /**
      * @see UserInterface
      */
-    public function eraseCredentials()
+    public function eraseCredentials(): void
     {
         // If you store any temporary, sensitive data on the user, clear it here
         // $this->plainPassword = null;
@@ -1197,5 +1070,22 @@ class User implements UserInterface
         $this->tutorialActive = $tutorialActive;
 
         return $this;
+    }
+
+    public function loadUserByIdentifier(string $identifier): UserInterface
+    {
+        $user = $this->findOneBy(['email' => $identifier]);
+
+        if (!$user) {
+            throw new UsernameNotFoundException(sprintf('User with email "%s" not found.', $identifier));
+        }
+
+        return $user;
+    }
+
+
+    public function getUserIdentifier(): string
+    {
+        return $this->email;
     }
 }

@@ -5,33 +5,23 @@ namespace App\Entity;
 use App\Repository\BossRecompenseRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=BossRecompenseRepository::class)
- */
+#[ORM\Entity(repositoryClass: BossRecompenseRepository::class)]
 class BossRecompense
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Boss::class, inversedBy="bossRecompenses")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Boss::class, inversedBy: 'bossRecompenses')]
     private $boss;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Recompense::class, inversedBy="bossRecompenses")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Recompense::class, inversedBy: 'bossRecompenses')]
     private $recompense;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $taux;
 
     public function getId(): ?int

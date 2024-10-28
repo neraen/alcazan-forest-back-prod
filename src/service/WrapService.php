@@ -1,41 +1,20 @@
 <?php
 
-
 namespace App\service;
 
-use App\Entity\Boss;
 use App\Entity\User;
 use App\Entity\Wrap;
-use App\Repository\BossRepository;
 use App\Repository\NiveauJoueurRepository;
 use App\Repository\UserBossRepository;
 use App\Repository\UserQueteRepository;
-use Doctrine\ORM\EntityManagerInterface;
-
 
 class WrapService
 {
-
-    private $bossRepository;
-    private $userBossRepository;
-    private $niveauJoueurRepository;
-
-    private $userQueteRepository;
-    private $entityManager;
-
     public function __construct(
-        BossRepository $bossRepository,
-        UserBossRepository $userBossRepository,
-        NiveauJoueurRepository $niveauJoueurRepository,
-        UserQueteRepository $userQueteRepository,
-        EntityManagerInterface $entityManager
-    )
-    {
-        $this->userBossRepository = $userBossRepository;
-        $this->bossRepository = $bossRepository;
-        $this->niveauJoueurRepository = $niveauJoueurRepository;
-        $this->userQueteRepository = $userQueteRepository;
-        $this->entityManager = $entityManager;
+        private UserBossRepository $userBossRepository,
+        private NiveauJoueurRepository $niveauJoueurRepository,
+        private UserQueteRepository $userQueteRepository,
+    ){
     }
 
     public function canPlayerChangeMap(User $user, Wrap $wrap): array {

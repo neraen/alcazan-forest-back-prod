@@ -3,21 +3,15 @@
 
 namespace App\service;
 
-
-use App\Entity\InventaireEquipement;
 use App\Entity\InventaireObjet;
 use App\Entity\MonstreCarreau;
 use App\Entity\User;
 use App\Repository\CarteCarreauRepository;
 use App\Repository\CarteRepository;
-use App\Repository\InventaireEquipementRepository;
 use App\Repository\InventaireObjetRepository;
 use App\Repository\InventaireRepository;
-use App\Repository\JoueurCaracteristiqueRepository;
-use App\Repository\SortilegeRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Security\Core\Security;
 
 class DeathService
 {
@@ -27,7 +21,6 @@ class DeathService
         private LevelingService $levelingService,
         private InventaireRepository $inventaireRepository,
         private InventaireObjetRepository $inventaireObjetRepository,
-        private InventaireEquipementRepository $inventaireEquipementRepository,
         private CarteRepository $carteRepository,
         private CarteCarreauRepository $carteCarreauRepository,
         private UserRepository $userRepository,

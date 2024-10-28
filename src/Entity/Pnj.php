@@ -2,73 +2,47 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\PnjRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=PnjRepository::class)
- */
-#[ApiResource]
+#[ORM\Entity(repositoryClass: PnjRepository::class)]
 class Pnj
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $avatar;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $skin;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Sequence::class, mappedBy="pnj")
-     */
+    #[ORM\OneToMany(mappedBy: 'pnj', targetEntity: Sequence::class)]
     private $sequences;
 
-    /**
-     * @ORM\OneToMany(targetEntity=CarteCarreau::class, mappedBy="pnj")
-     */
+    #[ORM\OneToMany(mappedBy: 'pnj', targetEntity: CarteCarreau::class)]
     private $carteCarreau;
 
-    /**
-     * @ORM\Column(type="string", length=500)
-     */
+    #[ORM\Column(type: 'string', length: 500)]
     private $description;
 
-    /**
-     * @ORM\Column(type="string", length=30)
-     */
+    #[ORM\Column(type: 'string', length: 30)]
     private $type;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Shop::class, inversedBy="pnjs")
-     */
+    #[ORM\ManyToOne(targetEntity: Shop::class, inversedBy: 'pnjs')]
     private $shop;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Quete::class, inversedBy="pnjs")
-     */
+    #[ORM\ManyToOne(targetEntity: Quete::class, inversedBy: 'pnjs')]
     private $quete;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Action::class, mappedBy="pnj")
-     */
+    #[ORM\OneToMany(mappedBy: 'pnj', targetEntity: Action::class)]
     private $actions;
 
     public function __construct()

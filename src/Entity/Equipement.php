@@ -7,98 +7,62 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=EquipementRepository::class)
- */
+#[ORM\Entity(repositoryClass: EquipementRepository::class)]
 class Equipement
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $nom;
 
-    /**
-     * @ORM\ManyToMany(targetEntity=Classe::class, inversedBy="equipements")
-     */
+    #[ORM\ManyToMany(targetEntity: Classe::class, inversedBy: 'equipements')]
     private $classe;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $icone;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $prixRevente;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $prixAchat;
 
-    /**
-     * @ORM\OneToMany(targetEntity=InventaireEquipement::class, mappedBy="equipement")
-     */
+    #[ORM\OneToMany(mappedBy: 'equipement', targetEntity: InventaireEquipement::class)]
     private $inventaireEquipements;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $level_min;
 
-    /**
-     * @ORM\OneToMany(targetEntity=EquipementCaracteristique::class, mappedBy="equipement")
-     */
+    #[ORM\OneToMany(mappedBy: 'equipement', targetEntity: EquipementCaracteristique::class)]
     private $equipementCaracteristiques;
 
-    /**
-     * @ORM\Column(type="text", nullable=true)
-     */
+    #[ORM\Column(type: 'text', nullable: true)]
     private $description;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=PositionEquipement::class, inversedBy="equipements")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: PositionEquipement::class, inversedBy: 'equipements')]
     private $positionEquipement;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserEquipement::class, mappedBy="equipement")
-     */
+    #[ORM\OneToMany(mappedBy: 'equipement', targetEntity: UserEquipement::class)]
     private $userEquipements;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Rarity::class, inversedBy="equipements")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Rarity::class, inversedBy: 'equipements')]
     private $rarity;
 
-    /**
-     * @ORM\OneToMany(targetEntity=ShopEquipement::class, mappedBy="equipement")
-     */
+    #[ORM\OneToMany(mappedBy: 'equipement', targetEntity: ShopEquipement::class)]
     private $shopEquipements;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Recompense::class, mappedBy="equipement")
-     */
+    #[ORM\OneToMany(mappedBy: 'equipement', targetEntity: Recompense::class)]
     private $recompenses;
 
-    /**
-     * @ORM\OneToMany(targetEntity=BossEquipement::class, mappedBy="equipement")
-     */
+    #[ORM\OneToMany(mappedBy: 'equipement', targetEntity: BossEquipement::class)]
     private $bossEquipements;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Action::class, mappedBy="equipement")
-     */
+    #[ORM\OneToMany(mappedBy: 'equipement', targetEntity: Action::class)]
     private $actions;
 
     public function __construct()

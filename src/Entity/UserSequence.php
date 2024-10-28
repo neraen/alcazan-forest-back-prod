@@ -5,28 +5,20 @@ namespace App\Entity;
 use App\Repository\UserSequenceRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=UserSequenceRepository::class)
- */
+#[ORM\Entity(repositoryClass: UserSequenceRepository::class)]
 class UserSequence
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="userSequences")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'userSequences')]
     private $user;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Sequence::class, inversedBy="userSequences")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Sequence::class, inversedBy: 'userSequences')]
     private $Sequence;
 
     public function getId(): ?int

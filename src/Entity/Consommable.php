@@ -7,86 +7,54 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=ConsommableRepository::class)
- */
+#[ORM\Entity(repositoryClass: ConsommableRepository::class)]
 class Consommable
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $nom;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $icone;
 
-    /**
-     * @ORM\OneToMany(targetEntity=InventaireConsommable::class, mappedBy="inventaire")
-     */
+    #[ORM\OneToMany(mappedBy: 'inventaire', targetEntity: InventaireConsommable::class)]
     private $inventaireConsommables;
 
-    /**
-     * @ORM\OneToMany(targetEntity=InventaireConsommable::class, mappedBy="consommable")
-     */
+    #[ORM\OneToMany(mappedBy: 'consommable', targetEntity: InventaireConsommable::class)]
     private $no;
 
-    /**
-     * @ORM\Column(type="text", nullable=true)
-     */
+    #[ORM\Column(type: 'text', nullable: true)]
     private $description;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $prixRevente;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $PrixAchat;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Recompense::class, mappedBy="consommable")
-     */
+    #[ORM\OneToMany(mappedBy: 'consommable', targetEntity: Recompense::class)]
     private $recompenses;
 
-    /**
-     * @ORM\Column(type="float")
-     */
+    #[ORM\Column(type: 'float')]
     private $cooldown;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $points;
 
-    /**
-     * @ORM\Column(type="boolean", nullable=true)
-     */
+    #[ORM\Column(type: 'boolean', nullable: true)]
     private $isBuff;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserConsommable::class, mappedBy="consommable")
-     */
+    #[ORM\OneToMany(mappedBy: 'consommable', targetEntity: UserConsommable::class)]
     private $userConsommables;
 
-    /**
-     * @ORM\Column(type="string", length=255, nullable=true)
-     */
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private $type;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Action::class, mappedBy="consommable")
-     */
+    #[ORM\OneToMany(mappedBy: 'consommable', targetEntity: Action::class)]
     private $actions;
 
     public function __construct()

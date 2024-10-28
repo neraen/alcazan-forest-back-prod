@@ -7,91 +7,57 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=ActionRepository::class)
- */
+#[ORM\Entity(repositoryClass: ActionRepository::class)]
 class Action
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $api_link;
 
-    /**
-     * @ORM\Column(type="string", nullable=true)
-     */
+    #[ORM\Column(type: 'string', nullable: true)]
     private $params;
 
-    /**
-     * @ORM\OneToMany(targetEntity=SequenceAction::class, mappedBy="action")
-     */
+    #[ORM\OneToMany(mappedBy: 'action', targetEntity: SequenceAction::class)]
     private $sequenceActions;
 
-    /**
-     * @ORM\OneToMany(targetEntity=CarteCarreau::class, mappedBy="action")
-     */
+    #[ORM\OneToMany(mappedBy: 'action', targetEntity: CarteCarreau::class)]
     private $carteCarreaus;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=ActionType::class, inversedBy="actions")
-     */
+    #[ORM\ManyToOne(targetEntity: ActionType::class, inversedBy: 'actions')]
     private $actionType;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Objet::class, inversedBy="actions")
-     */
+    #[ORM\ManyToOne(targetEntity: Objet::class, inversedBy: 'actions')]
     private $objet;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Equipement::class, inversedBy="actions")
-     */
+    #[ORM\ManyToOne(targetEntity: Equipement::class, inversedBy: 'actions')]
     private $equipement;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Consommable::class, inversedBy="actions")
-     */
+    #[ORM\ManyToOne(targetEntity: Consommable::class, inversedBy: 'actions')]
     private $consommable;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Boss::class, inversedBy="actions")
-     */
+    #[ORM\ManyToOne(targetEntity: Boss::class, inversedBy: 'actions')]
     private $boss;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Pnj::class, inversedBy="actions")
-     */
+    #[ORM\ManyToOne(targetEntity: Pnj::class, inversedBy: 'actions')]
     private $pnj;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Monstre::class, inversedBy="actions")
-     */
+    #[ORM\ManyToOne(targetEntity: Monstre::class, inversedBy: 'actions')]
     private $monstre;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Carte::class, inversedBy="actions")
-     */
+    #[ORM\ManyToOne(targetEntity: Carte::class, inversedBy: 'actions')]
     private $carte;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $quantity;
 
-    /**
-     * @ORM\Column(type="text", nullable=true)
-     */
+    #[ORM\Column(type: 'text', nullable: true)]
     private $message;
 
 

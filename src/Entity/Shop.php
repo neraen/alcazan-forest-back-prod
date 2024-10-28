@@ -7,41 +7,27 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=ShopRepository::class)
- */
+#[ORM\Entity(repositoryClass: ShopRepository::class)]
 class Shop
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    /**
-     * @ORM\OneToMany(targetEntity=ShopObjet::class, mappedBy="shop")
-     */
+    #[ORM\OneToMany(mappedBy: 'shop', targetEntity: ShopObjet::class)]
     private $shopObjets;
 
-    /**
-     * @ORM\Column(type="string", length=30)
-     */
+    #[ORM\Column(type: 'string', length: 30)]
     private $type;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Pnj::class, mappedBy="shop")
-     */
+    #[ORM\OneToMany(mappedBy: 'shop', targetEntity: Pnj::class)]
     private $pnjs;
 
-    /**
-     * @ORM\OneToMany(targetEntity=ShopEquipement::class, mappedBy="shop")
-     */
+    #[ORM\OneToMany(targetEntity: ShopEquipement::class, mappedBy: 'shop')]
     private $shopEquipements;
 
     public function __construct()

@@ -2,119 +2,73 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\CarteCarreauRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Annotation\Groups;
 
-/**
- * @ORM\Entity(repositoryClass=CarteCarreauRepository::class)
- */
+#[ORM\Entity(repositoryClass: CarteCarreauRepository::class)]
 class CarteCarreau
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     * @Groups({"carte_read"})
-     */
+
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Carte::class, inversedBy="carteCarreaus")
-     */
+    #[ORM\ManyToOne(targetEntity: Carte::class, inversedBy: 'carteCarreaus')]
     private $carte;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Carreau::class, inversedBy="carteCarreaux")
-     * @Groups({"carte_read"})
-     */
+    #[ORM\ManyToOne(targetEntity: Carreau::class, inversedBy: 'carteCarreaux')]
     private $carreau;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"carte_read"})
-     */
+    #[ORM\Column(type: 'integer')]
     private $abscisse;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"carte_read"})
-     */
+    #[ORM\Column(type: 'integer')]
     private $ordonnee;
 
-    /**
-     * @ORM\OneToOne(targetEntity=User::class, inversedBy="carteCarreau", cascade={"persist", "remove"})
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\OneToOne(inversedBy: 'carteCarreau', targetEntity: User::class, cascade: ['persist', 'remove'])]
     private $joueur;
 
-    /**
-     * @ORM\OneToOne(targetEntity=Monstre::class, mappedBy="carteCarreau", cascade={"persist", "remove"})
-     */
+    #[ORM\OneToOne(mappedBy: 'carteCarreau', targetEntity: Monstre::class, cascade: ['persist', 'remove'])]
     private $monstres;
 
 
-    /**
-     * @ORM\ManyToOne(targetEntity=MonstreCarreau::class, inversedBy="carteCarreaus")
-     */
+    #[ORM\ManyToOne(targetEntity: MonstreCarreau::class, inversedBy: 'carteCarreaus')]
     private $monstreCarreau;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $targetMapId;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Pnj::class, inversedBy="carteCarreau")
-     */
+    #[ORM\ManyToOne(targetEntity: Pnj::class, inversedBy: 'carteCarreau')]
     private $pnj;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $targetWrap;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $isUsable;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $isWrap;
 
-    /**
-     * @ORM\OneToMany(targetEntity=MonstreCarreau::class, mappedBy="carteCarreau")
-     */
+    #[ORM\OneToMany(mappedBy: 'carteCarreau', targetEntity: MonstreCarreau::class)]
     private $monstreCarreaus;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Action::class, inversedBy="carteCarreaus")
-     */
+    #[ORM\ManyToOne(targetEntity: Action::class, inversedBy: 'carteCarreaus')]
     private $action;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Boss::class, inversedBy="carteCarreaus")
-     */
+    #[ORM\ManyToOne(targetEntity: Boss::class, inversedBy: 'carteCarreaus')]
     private $boss;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Wrap::class, inversedBy="carteCarreaus")
-     */
+    #[ORM\ManyToOne(targetEntity: Wrap::class, inversedBy: 'carteCarreaus')]
     private $wrap;
 
     public function __construct()
     {
         $this->monstreCarreaus = new ArrayCollection();
     }
-
-
-
-
 
     public function getId(): ?int
     {

@@ -5,33 +5,23 @@ namespace App\Entity;
 use App\Repository\UserSortilegeRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=UserSortilegeRepository::class)
- */
+#[ORM\Entity(repositoryClass: UserSortilegeRepository::class)]
 class UserSortilege
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="userSortileges")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'userSortileges')]
     private $user;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Sortilege::class, inversedBy="userSortileges")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Sortilege::class, inversedBy: 'userSortileges')]
     private $sortilege;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $ordre;
 
     public function getId(): ?int

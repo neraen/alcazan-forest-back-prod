@@ -7,82 +7,52 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=SequenceRepository::class)
- */
+#[ORM\Entity(repositoryClass: SequenceRepository::class)]
 class Sequence
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $position;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $is_last;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Pnj::class, inversedBy="sequences")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Pnj::class, inversedBy: 'sequences')]
     private $pnj;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Dialogue::class, inversedBy="sequences")
-     */
+    #[ORM\ManyToOne(targetEntity: Dialogue::class, inversedBy: 'sequences')]
     private $dialogue;
 
-    /**
-     * @ORM\OneToMany(targetEntity=SequenceAction::class, mappedBy="sequence")
-     */
+    #[ORM\OneToMany(mappedBy: 'sequence', targetEntity: SequenceAction::class)]
     private $sequenceActions;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserSequence::class, mappedBy="Sequence")
-     */
+    #[ORM\OneToMany(mappedBy: 'Sequence', targetEntity: UserSequence::class)]
     private $userSequences;
 
-    /**
-     * @ORM\Column(type="boolean", nullable=true)
-     */
+    #[ORM\Column(type: 'boolean', nullable: true)]
     private $has_action;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Quete::class, inversedBy="sequences")
-     */
+    #[ORM\ManyToOne(targetEntity: Quete::class, inversedBy: 'sequences')]
     private $quete;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Recompense::class, mappedBy="sequence")
-     */
+    #[ORM\OneToMany(mappedBy: 'sequence', targetEntity: Recompense::class)]
     private $recompenses;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserQuete::class, mappedBy="sequence")
-     */
+    #[ORM\OneToMany(mappedBy: 'sequence', targetEntity: UserQuete::class)]
     private $userQuetes;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Sequence::class)
-     */
+    #[ORM\ManyToOne(targetEntity: Sequence::class)]
     private $lastSequence;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Sequence::class)
-     */
+    #[ORM\ManyToOne(targetEntity: Sequence::class)]
     private $nextSequence;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
 

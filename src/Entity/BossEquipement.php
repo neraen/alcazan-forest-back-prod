@@ -5,31 +5,21 @@ namespace App\Entity;
 use App\Repository\BossEquipementRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=BossEquipementRepository::class)
- */
+#[ORM\Entity(repositoryClass: BossEquipementRepository::class)]
 class BossEquipement
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Boss::class, inversedBy="bossEquipements")
-     */
+    #[ORM\ManyToOne(targetEntity: Boss::class, inversedBy: 'bossEquipements')]
     private $boss;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Equipement::class, inversedBy="bossEquipements")
-     */
+    #[ORM\ManyToOne(targetEntity: Equipement::class, inversedBy: 'bossEquipements')]
     private $equipement;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $tauxDrop;
 
     public function getId(): ?int

@@ -7,67 +7,43 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=BuffRepository::class)
- */
+#[ORM\Entity(repositoryClass: BuffRepository::class)]
 class Buff
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    /**
-     * @ORM\Column(type="string", length=255, nullable=true)
-     */
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private $icone;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $isCarac;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $isDispell;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $isBlocage;
 
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $value;
 
-    /**
-     * @ORM\OneToMany(targetEntity=UserBuff::class, mappedBy="buff")
-     */
+    #[ORM\OneToMany(mappedBy: 'buff', targetEntity: UserBuff::class)]
     private $userBuffs;
 
-    /**
-     * @ORM\OneToMany(targetEntity=BuffCaracteristique::class, mappedBy="buff")
-     */
+    #[ORM\OneToMany(mappedBy: 'buff', targetEntity: BuffCaracteristique::class)]
     private $buffCaracteristiques;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $duree;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Sortilege::class, mappedBy="buff")
-     */
+    #[ORM\OneToMany(mappedBy: 'buff', targetEntity: Sortilege::class)]
     private $sortileges;
 
     public function __construct()

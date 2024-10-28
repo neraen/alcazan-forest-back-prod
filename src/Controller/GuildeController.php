@@ -7,7 +7,7 @@ use App\Repository\JoueurGuildeRepository;
 use App\Repository\NiveauJoueurRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Routing\Attribute\Route;
 
 
 #[Route("/api", name:"api_")]

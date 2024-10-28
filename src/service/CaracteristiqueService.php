@@ -1,13 +1,10 @@
 <?php
 
-
 namespace App\service;
-
 
 use App\Entity\User;
 use App\Repository\CaracteristiqueRepository;
 use App\Repository\JoueurCaracteristiqueBonusRepository;
-use App\Repository\NiveauJoueurRepository;
 
 class CaracteristiqueService
 {

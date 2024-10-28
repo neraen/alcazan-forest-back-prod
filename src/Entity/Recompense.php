@@ -7,56 +7,36 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=RecompenseRepository::class)
- */
+#[ORM\Entity(repositoryClass: RecompenseRepository::class)]
 class Recompense
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Sequence::class, inversedBy="recompenses")
-     */
+    #[ORM\ManyToOne(targetEntity: Sequence::class, inversedBy: 'recompenses')]
     private $sequence;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $money;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $experience;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Objet::class, inversedBy="recompenses")
-     */
+    #[ORM\ManyToOne(targetEntity: Objet::class, inversedBy: 'recompenses')]
     private $objet;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Equipement::class, inversedBy="recompenses")
-     */
+    #[ORM\ManyToOne(targetEntity: Equipement::class, inversedBy: 'recompenses')]
     private $equipement;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Consommable::class, inversedBy="recompenses")
-     */
+    #[ORM\ManyToOne(targetEntity: Consommable::class, inversedBy: 'recompenses')]
     private $consommable;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $quantity;
 
-    /**
-     * @ORM\OneToMany(targetEntity=BossRecompense::class, mappedBy="recompense")
-     */
+    #[ORM\OneToMany(mappedBy: 'recompense', targetEntity: BossRecompense::class)]
     private $bossRecompenses;
 
     public function __construct()

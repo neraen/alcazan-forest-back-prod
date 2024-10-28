@@ -2,65 +2,26 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
-use App\Controller\JoueurNiveauController;
 use App\Repository\NiveauJoueurRepository;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Annotation\Groups;
 
-/**
- * @ORM\Entity(repositoryClass=NiveauJoueurRepository::class)
- */
-//#[
-//    ApiResource(
-//        collectionOperations: [
-//            'get',
-//            'post',
-//            'getAllCaracteristiques' => [
-//                'method' => 'GET',
-//                'path' => '/joueur/caracteristiques',
-//                'controller' => JoueurCaracteristiqueController::class
-//            ]
-//        ]
-//    )
-//]
-#[
-    ApiResource(
-        normalizationContext: ["groups"=> ["level_read"]],
-        collectionOperations: [
-            'getLevelAndExperience' => [
-                'method' => 'GET',
-                'path' => '/joueur/niveau',
-                'controller' => JoueurNiveauController::class
-            ]
-        ]
-    )
-]
+#[ORM\Entity(repositoryClass: NiveauJoueurRepository::class)]
 class NiveauJoueur
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\OneToOne(targetEntity=User::class, cascade={"persist", "remove"}, inversedBy="niveauJoueur")
-     * @Groups({"level_read"})
-     */
+    #[ORM\OneToOne(inversedBy: 'niveauJoueur', targetEntity: User::class, cascade: ['persist', 'remove'])]
     private $user;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Niveau::class, inversedBy="niveauJoueurs")
-     * @Groups({"users_read", "level_read"})
-     */
+
+    #[ORM\ManyToOne(targetEntity: Niveau::class, inversedBy: 'niveauJoueurs')]
     private $niveau;
 
-    /**
-     * @ORM\Column(type="integer")
-     * @Groups({"users_read", "level_read"})
-     */
+
+    #[ORM\Column(type: 'integer')]
     private $experience;
 
     public function getId(): ?int

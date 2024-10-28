@@ -5,33 +5,23 @@ namespace App\Entity;
 use App\Repository\JoueurGuildeRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=JoueurGuildeRepository::class)
- */
+#[ORM\Entity(repositoryClass: JoueurGuildeRepository::class)]
 class JoueurGuilde
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="joueurGuildes")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'joueurGuildes')]
     private $user;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Guilde::class, inversedBy="joueurGuildes")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Guilde::class, inversedBy: 'joueurGuildes')]
     private $guilde;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $grade;
 
     public function getId(): ?int

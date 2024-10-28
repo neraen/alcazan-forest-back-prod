@@ -2,45 +2,29 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\ClasseRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Serializer\Annotation\Groups;
 
-/**
- * @ORM\Entity(repositoryClass=ClasseRepository::class)
- */
+#[ORM\Entity(repositoryClass: ClasseRepository::class)]
 class Classe
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     * @Groups({"users_read", "carte_read"})
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $nom;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Sortilege::class, mappedBy="classe")
-     * @Groups({"users_read"})
-     */
+    #[ORM\OneToMany(mappedBy: 'classe', targetEntity: Sortilege::class)]
     private $sortileges;
 
-    /**
-     * @ORM\ManyToMany(targetEntity=Equipement::class, mappedBy="classe")
-     */
+    #[ORM\ManyToMany(targetEntity: Equipement::class, mappedBy: 'classe')]
     private $equipements;
 
-    /**
-     * @ORM\OneToMany(targetEntity=User::class, mappedBy="classe")
-     */
+    #[ORM\OneToMany(mappedBy: 'classe', targetEntity: User::class)]
     private $users;
 
     public function __construct()

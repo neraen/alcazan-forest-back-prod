@@ -5,37 +5,25 @@ namespace App\Entity;
 use App\Repository\UserBuffRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=UserBuffRepository::class)
- */
+#[ORM\Entity(repositoryClass: UserBuffRepository::class)]
 class UserBuff
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Buff::class, inversedBy="userBuffs")
-     */
+    #[ORM\ManyToOne(targetEntity: Buff::class, inversedBy: 'userBuffs')]
     private $buff;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="userBuffs")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'userBuffs')]
     private $user;
 
-    /**
-     * @ORM\Column(type="datetime")
-     */
+    #[ORM\Column(type: 'datetime')]
     private $dateDebut;
 
-    /**
-     * @ORM\Column(type="datetime")
-     */
+    #[ORM\Column(type: 'datetime')]
     private $dateFin;
 
     public function getId(): ?int

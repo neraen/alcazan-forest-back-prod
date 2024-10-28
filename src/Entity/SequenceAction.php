@@ -5,32 +5,22 @@ namespace App\Entity;
 use App\Repository\SequenceActionRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=SequenceActionRepository::class)
- */
+#[ORM\Entity(repositoryClass: SequenceActionRepository::class)]
 class SequenceAction
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Sequence::class, inversedBy="sequenceActions")
-     */
+    #[ORM\ManyToOne(targetEntity: Sequence::class, inversedBy: 'sequenceActions')]
     private $sequence;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Action::class, inversedBy="sequenceActions")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Action::class, inversedBy: 'sequenceActions')]
     private $action;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $position;
 
     public function getId(): ?int

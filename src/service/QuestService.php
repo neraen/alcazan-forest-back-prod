@@ -3,9 +3,6 @@
 namespace App\service;
 
 use App\Entity\Action;
-use App\Entity\InventaireConsommable;
-use App\Entity\InventaireEquipement;
-use App\Entity\Quete;
 use App\Entity\Sequence;
 use App\Entity\User;
 use App\Entity\UserQuete;

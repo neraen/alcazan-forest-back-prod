@@ -2,55 +2,37 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\MonstreCarreauRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=MonstreCarreauRepository::class)
- */
-#[ApiResource]
+#[ORM\Entity(repositoryClass: MonstreCarreauRepository::class)]
 class MonstreCarreau
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Monstre::class, inversedBy="case")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Monstre::class, inversedBy: 'case')]
     private $monstre;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $quantity;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $current_life;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $quantity_base;
 
-    /**
-     * @ORM\OneToMany(targetEntity=CarteCarreau::class, mappedBy="monstreCarreau")
-     */
+    #[ORM\OneToMany(mappedBy: 'monstreCarreau', targetEntity: CarteCarreau::class)]
     private $carteCarreaus;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=CarteCarreau::class, inversedBy="monstreCarreaus")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: CarteCarreau::class, inversedBy: 'monstreCarreaus')]
     private $carteCarreau;
 
     public function __construct()

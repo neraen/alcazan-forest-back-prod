@@ -5,28 +5,20 @@ namespace App\Entity;
 use App\Repository\ShopEquipementRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=ShopEquipementRepository::class)
- */
+#[ORM\Entity(repositoryClass: ShopEquipementRepository::class)]
 class ShopEquipement
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Shop::class, inversedBy="shopEquipements")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Shop::class, inversedBy: 'shopEquipements')]
     private $shop;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Equipement::class, inversedBy="shopEquipements")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Equipement::class, inversedBy: 'shopEquipements')]
     private $equipement;
 
     public function getId(): ?int

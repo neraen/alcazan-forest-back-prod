@@ -2,72 +2,47 @@
 
 namespace App\Entity;
 
-use ApiPlatform\Core\Annotation\ApiResource;
 use App\Repository\AlignementRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=AlignementRepository::class)
- */
+#[ORM\Entity(repositoryClass: AlignementRepository::class)]
 class Alignement
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $nom;
 
-    /**
-     * @ORM\Column(type="text", nullable=true)
-     */
+    #[ORM\Column(type: 'text', nullable: true)]
     private $description;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $couleur;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $caracteristiquePrincipale;
 
-    /**
-     * @ORM\Column(type="integer", nullable=true)
-     */
+    #[ORM\Column(type: 'integer', nullable: true)]
     private $caracteristiqueSecondaire;
 
-    /**
-     * @ORM\OneToOne(targetEntity=Carte::class, cascade={"persist", "remove"})
-     */
+    #[ORM\OneToOne(targetEntity: Carte::class, cascade: ['persist', 'remove'])]
     private $carte;
 
-    /**
-     * @ORM\OneToMany(targetEntity=User::class, mappedBy="alignement")
-     */
+    #[ORM\OneToMany(mappedBy: 'alignement', targetEntity: User::class)]
     private $users;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $icone;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Guilde::class, mappedBy="alignement")
-     */
+    #[ORM\OneToMany(mappedBy: 'alignement', targetEntity: Guilde::class)]
     private $guildes;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Quete::class, mappedBy="alignement")
-     */
+    #[ORM\OneToMany(mappedBy: 'alignement', targetEntity: Quete::class)]
     private $quetes;
 
     public function __construct()

@@ -7,31 +7,21 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=DialogueRepository::class)
- */
+#[ORM\Entity(repositoryClass: DialogueRepository::class)]
 class Dialogue
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\Column(type="string", length=2000)
-     */
+    #[ORM\Column(type: 'string', length: 2000)]
     private $contenu;
 
-    /**
-     * @ORM\OneToMany(targetEntity=Sequence::class, mappedBy="dialogue")
-     */
+    #[ORM\OneToMany(mappedBy: 'dialogue', targetEntity: Sequence::class)]
     private $sequences;
 
-    /**
-     * @ORM\Column(type="string", length=255)
-     */
+    #[ORM\Column(type: 'string', length: 255)]
     private $titre;
 
 

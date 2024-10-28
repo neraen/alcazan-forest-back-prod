@@ -5,38 +5,26 @@ namespace App\Entity;
 use App\Repository\UserQueteRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=UserQueteRepository::class)
- */
+#[ORM\Entity(repositoryClass: UserQueteRepository::class)]
 class UserQuete
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=User::class, inversedBy="userQuetes")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'userQuetes')]
     private $user;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Quete::class, inversedBy="userQuetes")
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\ManyToOne(targetEntity: Quete::class, inversedBy: 'userQuetes')]
     private $quete;
 
-    /**
-     * @ORM\Column(type="boolean")
-     */
+    #[ORM\Column(type: 'boolean')]
     private $isDone;
 
-    /**
-     * @ORM\ManyToOne(targetEntity=Sequence::class, inversedBy="userQuetes")
-     */
+    #[ORM\ManyToOne(targetEntity: Sequence::class, inversedBy: 'userQuetes')]
     private $sequence;
 
     public function getId(): ?int

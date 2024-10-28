@@ -7,42 +7,28 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
-/**
- * @ORM\Entity(repositoryClass=InventaireRepository::class)
- */
+#[ORM\Entity(repositoryClass: InventaireRepository::class)]
 class Inventaire
 {
-    /**
-     * @ORM\Id
-     * @ORM\GeneratedValue
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Id]
+    #[ORM\GeneratedValue]
+    #[ORM\Column(type: 'integer')]
     private $id;
 
-    /**
-     * @ORM\OneToOne(targetEntity=User::class, cascade={"persist", "remove"})
-     * @ORM\JoinColumn(nullable=false)
-     */
+    #[ORM\JoinColumn(nullable: false)]
+    #[ORM\OneToOne(targetEntity: User::class, cascade: ['persist', 'remove'])]
     private $user;
 
-    /**
-     * @ORM\Column(type="integer")
-     */
+    #[ORM\Column(type: 'integer')]
     private $tailleMax;
 
-    /**
-     * @ORM\OneToMany(targetEntity=InventaireObjet::class, mappedBy="inventaire")
-     */
+    #[ORM\OneToMany(mappedBy: 'inventaire', targetEntity: InventaireObjet::class)]
     private $inventaireObjets;
 
-    /**
-     * @ORM\OneToMany(targetEntity=InventaireEquipement::class, mappedBy="inventaire")
-     */
+    #[ORM\OneToMany(mappedBy: 'inventaire', targetEntity: InventaireEquipement::class)]
     private $inventaireEquipements;
 
-    /**
-     * @ORM\OneToMany(targetEntity=InventaireConsommable::class, mappedBy="inventaire")
-     */
+    #[ORM\OneToMany(mappedBy: 'inventaire', targetEntity: InventaireConsommable::class)]
     private $inventaireConsommables;
 
     public function __construct()
