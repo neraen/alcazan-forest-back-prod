@@ -20,7 +20,7 @@ security:
             methods: [POST]
 
         login:
-            pattern: ^/api/login
+            pattern: ^/api/login_check
             stateless: true
             json_login:
                 check_path: /api/login_check

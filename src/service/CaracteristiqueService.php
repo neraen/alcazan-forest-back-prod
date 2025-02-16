@@ -11,9 +11,7 @@ class CaracteristiqueService
     public function __construct(
         private readonly JoueurCaracteristiqueBonusRepository $joueurCaracteristiqueBonusRepository,
         private readonly CaracteristiqueRepository $caracteristiqueRepository
-    )
-    {
-
+    ){
     }
 
     public function getPlayerArmor(User $user): ?int {
