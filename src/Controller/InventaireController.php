@@ -79,7 +79,7 @@ class InventaireController extends AbstractController
 
 
     #[Route("/inventaire/equipement/unwear", name:"inventaire_equipement_unwear")]
-    public function unequipEquipement(
+    public function unwearEquipement(
         Request                                 $request,
         UserEquipementRepository                $userEquipementRepository,
         InventaireRepository                    $inventaireRepository,

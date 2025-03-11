@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\DTO\Equipement\CreateEquipementDTO;
 use App\Entity\Equipement;
 use App\Entity\EquipementCaracteristique;
 use App\Repository\CaracteristiqueRepository;
@@ -24,7 +25,7 @@ class EquipementController extends AbstractController
 
     #[Route("/equipement/create", name:"equipement_create")]
     public function createEquipement(
-        Request                             $request,
+        CreateEquipementDTO                 $createEquipementDTO,
         EntityManagerInterface              $entityManager,
         CaracteristiqueRepository           $caracteristiqueRepository,
         PositionEquipementRepository        $positionEquipementRepository,
@@ -33,8 +34,7 @@ class EquipementController extends AbstractController
         RarityRepository                    $rarityRepository,
         ClasseRepository                    $classeRepository
     ): Response {
-        $data = json_decode($request->getContent(), true);
-        $equipement = $data['equipement'];
+        $equipement = $createEquipementDTO->getEquipement();
 
         if($equipement['idEquipement']){
             $equipementEntity = $equipementRepository->find($equipement['idEquipement']);
