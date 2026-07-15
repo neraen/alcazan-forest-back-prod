@@ -7,6 +7,7 @@ use App\Repository\MonstreRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -16,13 +17,13 @@ class MonstreController extends AbstractController
 {
     public function __construct( ){}
 
-    #[Route("/monstres", name:"monstre_info")]
+    #[Route("/monstres", name:"monstre_info", methods: ["POST"])]
     public function getMonstresInfoForSelect(MonstreRepository $monstreRepository): Response {
         $pnjInfos = $monstreRepository->findAllAssoc();
-        return new Response(json_encode($pnjInfos));
+        return new JsonResponse($pnjInfos);
     }
 
-    #[Route("/monstre/create", name:"monstre_create")]
+    #[Route("/monstre/create", name:"monstre_create", methods: ["POST"])]
     public function createMonster(Request $request, EntityManagerInterface $entityManager): Response {
         $data = json_decode($request->getContent(), true);
         $monstre = $data['monstre'];
@@ -37,7 +38,7 @@ class MonstreController extends AbstractController
         $entityManager->persist($monstreEntity);
         $entityManager->flush();
 
-        return new Response(json_encode("ok"));
+        return new JsonResponse("ok");
     }
 
 }

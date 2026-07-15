@@ -56,6 +56,8 @@ class ChatService implements MessageComponentInterface {
         $conn->close();
     }
 }
-$server = new App('localhost', 8080);
-$server->route('/', new ChatService(), ['*']);
-$server->run();
+
+// NOTE : ce service dépend de Ratchet, qui n'est PAS dans composer.json — la classe
+// n'est pas utilisable en l'état. Le code de démarrage du serveur qui vivait ici a
+// été retiré : il instanciait un serveur WebSocket au premier autoload de la classe.
+// Pour le temps réel, voir la proposition Mercure dans DOCUMENTATION.md.

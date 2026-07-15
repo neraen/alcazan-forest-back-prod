@@ -59,7 +59,7 @@ class CarteCarreauRepository extends ServiceEntityRepository
                 'cc.isUsable', 'cc.isWrap', 'carreau.type as typeCarreau, level.niveau as niveau,alignement.nom as nomAlignement', 'alignement.icone as iconeAlignement',
                 'monstreCarreau.id as hasMonstre','pnj.skin as pnjSkin', 'pnj.avatar as pnjAvatar', 'pnj.name as pnjName',
                 'pnj.description as pnjDescription', 'pnj.id as pnjId', 'guilde.nom as nomGuilde', 'boss.name as bossName', 'boss.icone as bossSkin', 'boss.id as bossId',
-                'action.name as actionName', 'action.api_link as actionLink', 'action.params as actionParams')
+                'action.name as actionName', 'action.id as actionId')
             ->leftJoin('cc.carreau', 'carreau')
             ->leftJoin('cc.carte', 'carte')
             ->leftJoin('cc.joueur', 'user')

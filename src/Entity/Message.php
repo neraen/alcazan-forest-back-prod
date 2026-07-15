@@ -18,7 +18,7 @@ class Message
     private $expediteur;
 
     #[ORM\JoinColumn(nullable: false)]
-    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'messages')]
+    #[ORM\ManyToOne(targetEntity: User::class)]
     private $destinataire;
 
     #[ORM\Column(type: 'text')]

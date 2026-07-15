@@ -14,15 +14,11 @@ class HistoriqueService{
 
     public function recordInHistoryPlayer(User $user, string $message, bool $isExternal): void{
         $now = new \DateTime('now');
-        $dateNowFormattedForSql = $now->format('Y-m-d h:m:s');
-        $historiqueEntityPlayer = new Historique();
-        $historiqueEntityPlayer->setUser($user);
-        $historiqueEntityPlayer->setDate($now);
-        $historiqueEntityPlayer->setMessage($message);
 
-        $isExternal = $isExternal ? 1 : 0;
-
-        $this->entityManager->getConnection()->executeStatement('INSERT INTO historique (user_id, message, date, is_external) VALUES ("'.$user->getId().'", "'.$message.'", "'.$dateNowFormattedForSql.'", '.$isExternal.')');
+        $this->entityManager->getConnection()->executeStatement(
+            'INSERT INTO historique (user_id, message, date, is_external) VALUES (?, ?, ?, ?)',
+            [$user->getId(), $message, $now->format('Y-m-d H:i:s'), $isExternal ? 1 : 0]
+        );
     }
 
 

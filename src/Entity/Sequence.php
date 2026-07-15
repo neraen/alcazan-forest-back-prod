@@ -7,7 +7,13 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
+/**
+ * Étape d'une quête (ordonnée par position), ou dialogue autonome d'un PNJ
+ * de type "action" quand $quete est null. Le dialogue est porté par la
+ * séquence elle-même (titre + contenu), les boutons par $sequenceActions.
+ */
 #[ORM\Entity(repositoryClass: SequenceRepository::class)]
+#[ORM\UniqueConstraint(name: 'uniq_sequence_quete_position', columns: ['quete_id', 'position'])]
 class Sequence
 {
     #[ORM\Id]
@@ -18,50 +24,35 @@ class Sequence
     #[ORM\Column(type: 'integer')]
     private $position;
 
-    #[ORM\Column(type: 'boolean')]
-    private $is_last;
-
     #[ORM\JoinColumn(nullable: false)]
     #[ORM\ManyToOne(targetEntity: Pnj::class, inversedBy: 'sequences')]
     private $pnj;
 
-    #[ORM\ManyToOne(targetEntity: Dialogue::class, inversedBy: 'sequences')]
-    private $dialogue;
-
     #[ORM\OneToMany(mappedBy: 'sequence', targetEntity: SequenceAction::class)]
+    #[ORM\OrderBy(['position' => 'ASC'])]
     private $sequenceActions;
-
-    #[ORM\OneToMany(mappedBy: 'Sequence', targetEntity: UserSequence::class)]
-    private $userSequences;
-
-    #[ORM\Column(type: 'boolean', nullable: true)]
-    private $has_action;
 
     #[ORM\ManyToOne(targetEntity: Quete::class, inversedBy: 'sequences')]
     private $quete;
 
-    #[ORM\OneToMany(mappedBy: 'sequence', targetEntity: Recompense::class)]
-    private $recompenses;
+    #[ORM\OneToOne(mappedBy: 'sequence', targetEntity: Recompense::class)]
+    private $recompense;
 
     #[ORM\OneToMany(mappedBy: 'sequence', targetEntity: UserQuete::class)]
     private $userQuetes;
 
-    #[ORM\ManyToOne(targetEntity: Sequence::class)]
-    private $lastSequence;
-
-    #[ORM\ManyToOne(targetEntity: Sequence::class)]
-    private $nextSequence;
-
     #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private $dialogueTitre;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private $dialogueContenu;
 
     public function __construct()
     {
-        $this->dialogues = new ArrayCollection();
         $this->sequenceActions = new ArrayCollection();
-        $this->userSequences = new ArrayCollection();
-        $this->recompenses = new ArrayCollection();
         $this->userQuetes = new ArrayCollection();
     }
 
@@ -82,18 +73,6 @@ class Sequence
         return $this;
     }
 
-    public function getIsLast(): ?bool
-    {
-        return $this->is_last;
-    }
-
-    public function setIsLast(bool $is_last): self
-    {
-        $this->is_last = $is_last;
-
-        return $this;
-    }
-
     public function getPnj(): ?Pnj
     {
         return $this->pnj;
@@ -102,18 +81,6 @@ class Sequence
     public function setPnj(?Pnj $pnj): self
     {
         $this->pnj = $pnj;
-
-        return $this;
-    }
-
-    public function getDialogue(): ?Dialogue
-    {
-        return $this->dialogue;
-    }
-
-    public function setDialogue(?Dialogue $dialogue): self
-    {
-        $this->dialogue = $dialogue;
 
         return $this;
     }
@@ -148,48 +115,6 @@ class Sequence
         return $this;
     }
 
-    /**
-     * @return Collection|UserSequence[]
-     */
-    public function getUserSequences(): Collection
-    {
-        return $this->userSequences;
-    }
-
-    public function addUserSequence(UserSequence $userSequence): self
-    {
-        if (!$this->userSequences->contains($userSequence)) {
-            $this->userSequences[] = $userSequence;
-            $userSequence->setSequence($this);
-        }
-
-        return $this;
-    }
-
-    public function removeUserSequence(UserSequence $userSequence): self
-    {
-        if ($this->userSequences->removeElement($userSequence)) {
-            // set the owning side to null (unless already changed)
-            if ($userSequence->getSequence() === $this) {
-                $userSequence->setSequence(null);
-            }
-        }
-
-        return $this;
-    }
-
-    public function getHasAction(): ?bool
-    {
-        return $this->has_action;
-    }
-
-    public function setHasAction(?bool $has_action): self
-    {
-        $this->has_action = $has_action;
-
-        return $this;
-    }
-
     public function getQuete(): ?Quete
     {
         return $this->quete;
@@ -202,32 +127,14 @@ class Sequence
         return $this;
     }
 
-    /**
-     * @return Collection|Recompense[]
-     */
-    public function getRecompenses(): Collection
+    public function getRecompense(): ?Recompense
     {
-        return $this->recompenses;
+        return $this->recompense;
     }
 
-    public function addRecompense(Recompense $recompense): self
+    public function setRecompense(?Recompense $recompense): self
     {
-        if (!$this->recompenses->contains($recompense)) {
-            $this->recompenses[] = $recompense;
-            $recompense->setSequence($this);
-        }
-
-        return $this;
-    }
-
-    public function removeRecompense(Recompense $recompense): self
-    {
-        if ($this->recompenses->removeElement($recompense)) {
-            // set the owning side to null (unless already changed)
-            if ($recompense->getSequence() === $this) {
-                $recompense->setSequence(null);
-            }
-        }
+        $this->recompense = $recompense;
 
         return $this;
     }
@@ -262,30 +169,6 @@ class Sequence
         return $this;
     }
 
-    public function getLastSequence(): ?self
-    {
-        return $this->lastSequence;
-    }
-
-    public function setLastSequence(?self $lastSequence): self
-    {
-        $this->lastSequence = $lastSequence;
-
-        return $this;
-    }
-
-    public function getNextSequence(): ?self
-    {
-        return $this->nextSequence;
-    }
-
-    public function setNextSequence(?self $nextSequence): self
-    {
-        $this->nextSequence = $nextSequence;
-
-        return $this;
-    }
-
     public function getName(): ?string
     {
         return $this->name;
@@ -294,6 +177,30 @@ class Sequence
     public function setName(string $name): self
     {
         $this->name = $name;
+
+        return $this;
+    }
+
+    public function getDialogueTitre(): ?string
+    {
+        return $this->dialogueTitre;
+    }
+
+    public function setDialogueTitre(?string $dialogueTitre): self
+    {
+        $this->dialogueTitre = $dialogueTitre;
+
+        return $this;
+    }
+
+    public function getDialogueContenu(): ?string
+    {
+        return $this->dialogueContenu;
+    }
+
+    public function setDialogueContenu(?string $dialogueContenu): self
+    {
+        $this->dialogueContenu = $dialogueContenu;
 
         return $this;
     }

@@ -38,6 +38,11 @@ security:
             provider: app_user_provider
 
     access_control:
-        - { path: ^/api/login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
-        - { path: ^/api/users, roles: IS_AUTHENTICATED_ANONYMOUSLY }
+        - { path: ^/api/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/users, roles: PUBLIC_ACCESS }
+        # Outils d'administration (MapMaker, QuestMaker, etc.) : réservés aux admins
+        # Le QuestMaker entier (lectures comprises) vit sous /api/quest/editor.
+        - { path: ^/api/quest/editor, roles: ROLE_ADMIN }
+        - { path: ^/api/(map|pnj|monstre|equipement)/(create|update), roles: ROLE_ADMIN }
+        - { path: ^/insert, roles: ROLE_ADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

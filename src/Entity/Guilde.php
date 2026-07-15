@@ -43,9 +43,6 @@ class Guilde
     #[ORM\Column(type: 'string', length: 255)]
     private $banner;
 
-    #[ORM\Column(type: 'integer')]
-    private $nbJoueurMax;
-
     public function __construct()
     {
         $this->users = new ArrayCollection();
@@ -201,15 +198,4 @@ class Guilde
         return $this;
     }
 
-    public function getNbJoueurMax(): ?int
-    {
-        return $this->nbJoueurMax;
-    }
-
-    public function setNbJoueurMax(int $nbJoueurMax): self
-    {
-        $this->nbJoueurMax = $nbJoueurMax;
-
-        return $this;
-    }
 }

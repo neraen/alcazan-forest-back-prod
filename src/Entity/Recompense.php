@@ -7,6 +7,10 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
+/**
+ * Récompense d'une séquence de quête (une seule par séquence),
+ * ou récompense de boss via BossRecompense (sequence null).
+ */
 #[ORM\Entity(repositoryClass: RecompenseRepository::class)]
 class Recompense
 {
@@ -15,7 +19,7 @@ class Recompense
     #[ORM\Column(type: 'integer')]
     private $id;
 
-    #[ORM\ManyToOne(targetEntity: Sequence::class, inversedBy: 'recompenses')]
+    #[ORM\OneToOne(targetEntity: Sequence::class, inversedBy: 'recompense')]
     private $sequence;
 
     #[ORM\Column(type: 'integer', nullable: true)]

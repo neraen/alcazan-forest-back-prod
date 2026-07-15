@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Repository\ObjetRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -14,7 +15,7 @@ class ObjectControlleur extends AbstractController{
     public function __construct(){}
 
 
-    #[Route("/objets", name:"all_objets")]
+    #[Route("/objets", name:"all_objets", methods: ["POST"])]
     public function getAllObjets(ObjetRepository $objetRepository): Response {
         $objets = $objetRepository->findAll();
         $objetsNormalized = [];
@@ -27,8 +28,8 @@ class ObjectControlleur extends AbstractController{
             ];
         }
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'objets' => $objetsNormalized
-        ]));
+        ]);
     }
 }

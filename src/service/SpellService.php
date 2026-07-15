@@ -43,10 +43,6 @@ class SpellService
     ){
     }
 
-    public function egal1(){
-        return 1;
-    }
-
     public function doDamage(User $target, Sortilege $spell, User $user){
 
         $caracteristiques = $this->getCaracsForSpell($user, $spell);
@@ -89,7 +85,7 @@ class SpellService
 
         if($life <= 0){
             $killMessage = "Vous avez terrassé  {$target->getName()}.";
-            $userBossEntity =$this->userBossRepository->findOneBy(['boss' => $target->getId()]);
+            $userBossEntity = $this->userBossRepository->findOneBy(['boss' => $target->getId(), 'user' => $user->getId()]);
             if(!is_null($userBossEntity)){
                 $userBossEntity->setLastKill(new \DateTime('now'));
                 $userBossEntity->setNumberKill($userBossEntity->getNumberKill() + 1);
@@ -201,7 +197,7 @@ class SpellService
         $life = $target->getCurrentLife() - $damage;
 
         $puissanceMonstre = $target->getMonstre()->getPuissance();
-        $armureJoueur = 30;
+        $armureJoueur = $this->caracteristiqueService->getPlayerArmor($user);
         $damageReturns =  floor(mt_rand($puissanceMonstre,$puissanceMonstre * 2.2)) - ($armureJoueur * 0.2);
 
         $lifeJoueurAfterReturns = $user->getCurrentLife() - $damageReturns;
@@ -217,16 +213,18 @@ class SpellService
     public function applyBuffEffect(User $target, Sortilege $spell): bool{
         $buff = $spell->getBuff();
         if(!$this->playerCanBeBuffed($buff, $target)){
-            $userBuffEntity = new UserBuff();
-            $userBuffEntity->setUser($target);
-            $userBuffEntity->setBuff($buff);
-            $datetimeNow = new \DateTime('now');
-            $userBuffEntity->setDateDebut(new \DateTime('now'));
-            $userBuffEntity->setDateFin($datetimeNow->modify('+'.$buff->getDuree().' seconds'));
-
-            $this->entityManager->persist($userBuffEntity);
-            $this->entityManager->flush();
+            return false;
         }
+
+        $userBuffEntity = new UserBuff();
+        $userBuffEntity->setUser($target);
+        $userBuffEntity->setBuff($buff);
+        $datetimeNow = new \DateTime('now');
+        $userBuffEntity->setDateDebut(new \DateTime('now'));
+        $userBuffEntity->setDateFin($datetimeNow->modify('+'.$buff->getDuree().' seconds'));
+
+        $this->entityManager->persist($userBuffEntity);
+        $this->entityManager->flush();
 
         return true;
     }
@@ -234,7 +232,7 @@ class SpellService
     public function playerCanBeBuffed(Buff $buff, User $user): bool{
         $isPlayerBuffed = $this->userBuffRepository->findOneBy(['buff' => $buff->getId(), 'user' => $user->getId()]);
         $allBuffsInPlayer = $this->userBuffRepository->findBy(['user' => $user]);
-        return $isPlayerBuffed && count($allBuffsInPlayer) < 3;
+        return $isPlayerBuffed === null && count($allBuffsInPlayer) < 3;
     }
 
     public function getCaracsForSpell(User $user, Sortilege $spell): array{

@@ -5,12 +5,7 @@ namespace App\Controller;
 use App\Entity\Friend;
 use App\Entity\InventaireEquipement;
 use App\Entity\JoueurGuilde;
-use App\Enum\Classe;
-use App\Event\NextQuestSequenceEvent;
-use App\Repository\AlignementRepository;
-use App\Repository\BossRecompenseRepository;
 use App\Repository\BossRepository;
-use App\Repository\ClasseRepository;
 use App\Repository\ConsommableRepository;
 use App\Repository\EquipementRepository;
 use App\Repository\FriendRepository;
@@ -19,26 +14,18 @@ use App\Repository\InventaireConsommableRepository;
 use App\Repository\InventaireEquipementRepository;
 use App\Repository\InventaireRepository;
 use App\Repository\MonstreCarreauRepository;
-use App\Repository\NiveauJoueurRepository;
-use App\Repository\QueteRepository;
-use App\Repository\RecompenseRepository;
-use App\Repository\SequenceActionRepository;
-use App\Repository\SequenceRepository;
 use App\Repository\SortilegeRepository;
-use App\Repository\UserQueteRepository;
 use App\Repository\UserRepository;
 use App\service\DeathService;
 use App\service\HistoriqueService;
-use App\service\InventaireService;
 use App\service\LevelingService;
-use App\service\QuestService;
 use App\service\SpellService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -49,7 +36,7 @@ class PlayerActionController extends AbstractController
 {
     public function __construct(){}
 
-    #[Route("/joueur/attack/joueur", name:"joueur_attack_joueur")]
+    #[Route("/joueur/attack/joueur", name:"joueur_attack_joueur", methods: ["POST"])]
     public function attackPlayerVsPlayer(
         Request                 $request,
         UserRepository          $userRepository,
@@ -66,6 +53,8 @@ class PlayerActionController extends AbstractController
         $target = $userRepository->find($data['targetId']);
 
         $experience = 0;
+        $message = "";
+        $valueReturned = 0;
         if($spell->getType() === "attack"){
 
             $arrayStat['attack'] = $spellService->doDamage($target, $spell, $user);
@@ -89,9 +78,11 @@ class PlayerActionController extends AbstractController
             $valueReturned = $arrayStat['soin']['value'];
 
         }else if($spell->getType() === "buff"){
-            $spellService->applyBuffEffect($target, $spell);
+            $buffApplyed = $spellService->applyBuffEffect($target, $spell);
             $valueReturned = 0;
-            $message = "Vous utilisez {$spell->getNom()} sur {$target->getPseudo()}";
+            $message = $buffApplyed
+                ? "Vous utilisez {$spell->getNom()} sur {$target->getPseudo()}"
+                : "{$target->getPseudo()} est déjà sous cet effet (ou a atteint la limite de 3 buffs)";
         }
 
 
@@ -118,7 +109,7 @@ class PlayerActionController extends AbstractController
     }
 
 
-    #[Route("/joueur/attack/monster", name:"joueur_attack_monster")]
+    #[Route("/joueur/attack/monster", name:"joueur_attack_monster", methods: ["POST"])]
     public function attackPlayerVsMonster(
         Request                     $request,
         SortilegeRepository         $sortilegeRepository,
@@ -178,7 +169,7 @@ class PlayerActionController extends AbstractController
     }
 
 
-    #[Route("/joueur/attack/boss", name:"joueur_attack_boss")]
+    #[Route("/joueur/attack/boss", name:"joueur_attack_boss", methods: ["POST"])]
     public function attackPlayerVsBoss(
         Request                 $request,
         SortilegeRepository     $sortilegeRepository,
@@ -244,7 +235,7 @@ class PlayerActionController extends AbstractController
     }
 
 
-    #[Route("/joueur/spell/self", name:"joueur_spell_self")]
+    #[Route("/joueur/spell/self", name:"joueur_spell_self", methods: ["POST"])]
     public function useSpellAutoFocused(
         Request             $request,
         SortilegeRepository $sortilegeRepository,
@@ -255,117 +246,27 @@ class PlayerActionController extends AbstractController
         $arrayStat = [];
         $user = $this->getUser();
 
+        $message = "";
         if($spell->getType() === "soin"){
             $arrayStat = $spellService->healPlayer($user, $spell, $user);
             $message =  "Vous vous soignez avec {$spell->getNom()}, vous récupèrez {$arrayStat['value']} points de vie <br />";
 
         }else if ($spell->getType() === "buff"){
             $buffApplyed = $spellService->applyBuffEffect($user, $spell);
-            if($buffApplyed){
-                $message =  "Vous êtes maintenant sous les effets de {$spell->getNom()} <br />";
-            }
+            $message = $buffApplyed
+                ? "Vous êtes maintenant sous les effets de {$spell->getNom()} <br />"
+                : "Vous êtes déjà sous cet effet (ou avez atteint la limite de 3 buffs) <br />";
         }
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'message' => $message,
             'life' => $arrayStat['life'] ?? $user->getCurrentLife(),
             'needRefresh' => true
-        ]));
+        ]);
     }
 
 
-    #[Route("/user/choice/classe", name:"user_choose_class")]
-    public function chooseAClass(
-        Request                         $request,
-        InventaireService               $inventaireService,
-        QuestService                    $questService,
-        ClasseRepository                $classeRepository,
-        UserRepository                  $userRepository,
-        SequenceActionRepository        $sequenceActionRepository,
-        EquipementRepository            $equipementRepository,
-    ): Response {
-        $data = json_decode($request->getContent(), true);
-        $user = $this->getUser();
-        $classeEntity = $classeRepository->findOneBy(['nom' => $data['classe']]);
-        $userRepository->updateClasse($classeEntity->getId(), $this->getUser()->getId());
-
-        /* todo : mettre en place des récompense "par action" dans les quêtes + utiliser les id */
-        switch ($data['classe']){
-            case Classe::ARCHER->value:
-                $equipement = $equipementRepository->findOneBy(['id' => 2]);
-                break;
-            case Classe::SORCIER->value:
-                $equipement = $equipementRepository->findOneBy(['id' => 23]);
-                break;
-            case Classe::GUERRIER->value:
-                $equipement = $equipementRepository->findOneBy(['id' => 22]);
-                break;
-            case Classe::MOINE->value:
-                $equipement = $equipementRepository->findOneBy(['id' => 24]);
-                break;
-        }
-
-        $inventaireService->addEquipementToUserInventaire($user->getId(), $equipement->getId());
-
-        $userQuete = $questService->validateQuestAction($user, $data['sequenceId']);
-
-        if($userQuete->getSequence()->getHasAction()){
-            $actions = $sequenceActionRepository->getAllActionsBySequence($userQuete->getSequence()->getId());
-        }
-        $hasConditionalAction = $questService->checkSequenceHaveConditionalAction($actions);
-
-        $response = [
-            'title' => $userQuete->getQuete()->getName(),
-            'dialogue' => $userQuete->getSequence()->getDialogue()->getContenu() ?? '',
-            'actions' => $actions ?? [],
-            'sequenceId' => $userQuete->getSequence()->getId(),
-            'hasConditionalAction' => $hasConditionalAction,
-            'respectSequenceConditions' => true
-        ];
-
-        $json = json_encode($response);
-
-        return new Response($json);
-    }
-
-    #[Route("/user/choice/alignement", name:"user_choose_alignement")]
-    public function chooseAnAlignement(
-        Request                         $request,
-        QuestService                    $questService,
-        AlignementRepository            $alignementRepository,
-        SequenceActionRepository        $sequenceActionRepository,
-        EntityManagerInterface          $entityManager
-    ): Response {
-        $data = json_decode($request->getContent(), true);
-        $user = $this->getUser();
-        $alignementEntity = $alignementRepository->find($data['alignement']);
-        $user->setAlignement($alignementEntity);
-        $entityManager->persist($user);
-        $entityManager->flush();
-
-        $userQuete = $questService->validateQuestAction($user, $data['sequenceId']);
-
-        if($userQuete->getSequence()->getHasAction()){
-            $actions = $sequenceActionRepository->getAllActionsBySequence($userQuete->getSequence()->getId());
-        }
-        $hasConditionalAction = $questService->checkSequenceHaveConditionalAction($actions);
-
-        $response = [
-            'title' => $userQuete->getQuete()->getName(),
-            'dialogue' => $userQuete->getSequence()->getDialogue()->getContenu() ?? '',
-            'actions' => $actions ?? [],
-            'sequenceId' => $userQuete->getSequence()->getId(),
-            'hasConditionalAction' => $hasConditionalAction,
-            'respectSequenceConditions' => true
-        ];
-
-        $json = json_encode($response);
-
-        return new Response($json);
-    }
-
-
-    #[Route("/joueur/use/consommable", name:"joueur_use_consommable")]
+    #[Route("/joueur/use/consommable", name:"joueur_use_consommable", methods: ["POST"])]
     public function useConsommable(
         Request                         $request,
         InventaireRepository            $inventaireRepository,
@@ -420,16 +321,16 @@ class PlayerActionController extends AbstractController
 
 
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'life' =>  $user->getCurrentLife(),
             'mana' => $user->getCurrentMana(),
             'message' => $message
-        ]));
+        ]);
 
     }
 
 
-    #[Route("/joueur/buy/shop", name:"joueur_buy_shop")]
+    #[Route("/joueur/buy/shop", name:"joueur_buy_shop", methods: ["POST"])]
     public function playerBuyItem(
         Request                         $request,
         EquipementRepository            $equipementRepository,
@@ -443,43 +344,42 @@ class PlayerActionController extends AbstractController
         $user = $this->getUser();
         $moneyAfterBuy = $user->getMoney() - $equipementEntity->getPrixAchat();
 
-        $message = "";
-
-        if($moneyAfterBuy >= 0){
-
-            $inventaireEntity = $inventaireRepository->findOneBy(['user' => $user->getId()]);
-            $shouldIncrementExistingEquipement = $inventaireEquipementRepository->findOneBy(['inventaire' => $inventaireEntity->getId(), 'equipement' => $idEquipement]);
-
-            if($shouldIncrementExistingEquipement){
-                $shouldIncrementExistingEquipement->setQuantity($shouldIncrementExistingEquipement->getQuantity() + 1);
-                $entityManager->persist($shouldIncrementExistingEquipement);
-                $entityManager->flush();
-            }else{
-                $inventaireEquipementEntity = new InventaireEquipement();
-                $equipementEntity = $equipementRepository->findOneBy(['id' =>  $data['idEquipement']]);
-                $inventaireEquipementEntity->setQuantity(1);
-                $inventaireEquipementEntity->setEquipement($equipementEntity);
-                $inventaireEquipementEntity->setInventaire($inventaireEntity);
-                $entityManager->persist($inventaireEquipementEntity);
-                $entityManager->flush();
-            }
-
-            $user->setMoney($moneyAfterBuy);
-            $entityManager->persist($user);
-            $entityManager->flush();
+        if($moneyAfterBuy < 0){
+            return new JsonResponse([
+                'money' => $user->getMoney(),
+                'message' => "Vous n'avez pas assez d'or pour acheter cet objet."
+            ]);
         }
 
-        return new Response(json_encode(['money' => $moneyAfterBuy]));
+        $inventaireEntity = $inventaireRepository->findOneBy(['user' => $user->getId()]);
+        $shouldIncrementExistingEquipement = $inventaireEquipementRepository->findOneBy(['inventaire' => $inventaireEntity->getId(), 'equipement' => $idEquipement]);
+
+        if($shouldIncrementExistingEquipement){
+            $shouldIncrementExistingEquipement->setQuantity($shouldIncrementExistingEquipement->getQuantity() + 1);
+            $entityManager->persist($shouldIncrementExistingEquipement);
+        }else{
+            $inventaireEquipementEntity = new InventaireEquipement();
+            $inventaireEquipementEntity->setQuantity(1);
+            $inventaireEquipementEntity->setEquipement($equipementEntity);
+            $inventaireEquipementEntity->setInventaire($inventaireEntity);
+            $entityManager->persist($inventaireEquipementEntity);
+        }
+
+        $user->setMoney($moneyAfterBuy);
+        $entityManager->persist($user);
+        $entityManager->flush();
+
+        return new JsonResponse(['money' => $moneyAfterBuy]);
     }
 
 
-    #[Route("/chat/init", name:"chat_init")]
+    #[Route("/chat/init", name:"chat_init", methods: ["POST"])]
     public function initChat(){
         //$chat = new ChatService();
     }
 
 
-    #[Route("/joueur/guilde/join", name:"joueur_guilde_join")]
+    #[Route("/joueur/guilde/join", name:"joueur_guilde_join", methods: ["POST"])]
     public function joueurGuildeJoin(
         Request                 $request,
         GuildeRepository        $guildeRepository,
@@ -502,37 +402,14 @@ class PlayerActionController extends AbstractController
 
         $message = "Vous candidature à été envoyer au baron de la guilde {$guildeEntity->getNom()}";
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'message' =>  $message,
-        ]));
+        ]);
 
     }
 
 
-    #[Route("/user/recompense/boss", name:"joueur_recompense_boss")]
-    public function getRecompenseBoss(Request $request, BossRecompenseRepository $bossRecompenseRepository): Response {
-        $data = json_decode($request->getContent(), true);
-        $recompenses = $bossRecompenseRepository->findBy(['boss' => $data['bossId']]);
-
-        $recompenseEntity = $recompenses[0]->getRecompense();
-        $message = "";
-        if(!is_null($recompenseEntity->getEquipement())){
-            $message .= "Vous gagnez {$recompenseEntity->getEquipement()->getNom()}. <br />";
-        }
-        if(!is_null($recompenseEntity->getMoney())){
-            $message .= "Vous gagnez {$recompenseEntity->getMoney()} pièces d'or. <br />";
-        }
-        if(!is_null($recompenseEntity->getExperience())){
-            $message .= "Vous gagnez {$recompenseEntity->getExperience()} points d'expérience. <br />";
-        }
-
-        return new Response(json_encode([
-            'message' =>  $message,
-        ]));
-    }
-
-
-    #[Route("/joueur/add/friend", name:"joueur_add_friend")]
+    #[Route("/joueur/add/friend", name:"joueur_add_friend", methods: ["POST"])]
     public function joueurAddFriend(Request $request, UserRepository $userRepository, EntityManagerInterface $entityManager): Response {
         $data = json_decode($request->getContent(), true);
         $userAdded = $data['userId'];
@@ -547,14 +424,14 @@ class PlayerActionController extends AbstractController
         $entityManager->flush();
 
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'message' =>  "Le joueur {$userAddedEntity->getPseudo()} a bien été ajouté à votre liste d'amis",
             'friendId' => $friendEntity->getId()
-        ]));
+        ]);
     }
 
 
-    #[Route("/joueur/remove/friend", name:"joueur_remove_friend")]
+    #[Route("/joueur/remove/friend", name:"joueur_remove_friend", methods: ["POST"])]
     public function joueurRemvoveFriend(Request $request, FriendRepository $friendRepository): Response {
         $data = json_decode($request->getContent(), true);
         $friendId = $data['friendId'];
@@ -566,47 +443,9 @@ class PlayerActionController extends AbstractController
         } catch (ORMException $e) {
         }
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'message' =>  "Vous n'êtes désormais plus amis.",
-        ]));
-    }
-
-
-    #[Route("/joueur/quete/next", name:"joueur_quete_next")]
-    public function nextSequence(Request $request, QueteRepository $queteRepository, UserQueteRepository $userQueteRepository, EntityManagerInterface $entityManager): Response {
-        $data = json_decode($request->getContent(), true);
-        $questId = $data['questId'];
-        $questEntity = $queteRepository->find($questId);
-        $user = $this->getUser();
-        $actualQuestPosition = $userQueteRepository->findOneBy(['user' => $user, 'quete' => $questEntity]);
-        $actualSequence = $actualQuestPosition->getSequence();
-        if(!$actualSequence->getIsLast()){
-            $nextSequence = $actualSequence->getNextSequence();
-            $actualQuestPosition->setSequence($nextSequence);
-            $entityManager->persist($actualQuestPosition);
-            $entityManager->flush();
-        }else{
-            $actualQuestPosition->setIsDone(true);
-            $entityManager->persist($actualQuestPosition);
-            $entityManager->flush();
-        }
-
-
-        return new Response(json_encode([
-            'message' =>  "Vous avez bien avancé dans la quête.",
-        ]));
-    }
-
-    public function changeSequence($sequenceName, $value){
-      //  $sequence = $sequenceRepository->findOneBy(['name' => $sequenceName]);
-      //  $sequence->setNextVal($value);
-      //  $entityManager->persist($sequence);
-     //   $entityManager->flush();
-     //   return $sequence->getNextVal();
-    }
-
-    public function giveObjectToPnj(Request $request){
-
+        ]);
     }
 
 

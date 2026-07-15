@@ -6,6 +6,7 @@ use App\Repository\EquipementCaracteristiqueRepository;
 use App\Repository\UserEquipementRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -16,7 +17,7 @@ class ProfilControlleur extends AbstractController
     public function __construct(){}
 
 
-    #[Route("/profil/joueur/equipement", name:"profil_joueur_equipement")]
+    #[Route("/profil/joueur/equipement", name:"profil_joueur_equipement", methods: ["POST"])]
     function getEquipementEquipeJoueurForProfil(
         Request                             $request,
         UserEquipementRepository            $userEquipementRepository,
@@ -32,8 +33,6 @@ class ProfilControlleur extends AbstractController
             $equipement['caracteristiques'] = $caracterisitques;
         }
 
-        $json = json_encode($equipements);
-
-        return new Response($json);
+        return new JsonResponse($equipements);
     }
 }

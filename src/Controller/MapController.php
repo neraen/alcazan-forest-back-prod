@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Config\GameContent;
 use App\Entity\Carte;
 use App\Entity\CarteCarreau;
 use App\Entity\MonstreCarreau;
@@ -15,6 +16,7 @@ use App\Repository\WrapRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -24,7 +26,7 @@ class MapController extends AbstractController
 
     public function __construct(){}
 
-    #[Route("/map/cases/data", name:"get_map_cases_data")]
+    #[Route("/map/cases/data", name:"get_map_cases_data", methods: ["POST"])]
     public function getMapAndCasesData(Request $request, CarteCarreauRepository $carteCarreauRepository, CarteRepository $carteRepository): Response {
         $data = json_decode($request->getContent(), true);
         $mapId = $data['mapId'];
@@ -33,22 +35,22 @@ class MapController extends AbstractController
         $returnMapInfo['mapInfo'] = $carteRepository->getMapName($mapId);
         $returnMapInfo['mapId'] = $mapId;
 
-        return new Response(json_encode($returnMapInfo));
+        return new JsonResponse($returnMapInfo);
     }
 
 
-    #[Route("/map/all", name:"get_all_maps")]
+    #[Route("/map/all", name:"get_all_maps", methods: ["POST"])]
     public function getAllMaps(CarteRepository $carteRepository): Response {
         $maps = $carteRepository->getAllMap();
-        return new Response(json_encode($maps));
+        return new JsonResponse($maps);
     }
 
 
-    #[Route("/map/create", name:"create_map")]
+    #[Route("/map/create", name:"create_map", methods: ["POST"])]
     public function createmap(Request $request, CarreauRepository $carreauRepository, EntityManagerInterface $entityManager): Response
     {
         $data = json_decode($request->getContent(), true);
-        $case = $carreauRepository->find(1);
+        $case = $carreauRepository->find(GameContent::DEFAULT_CARREAU_ID);
         $carte = new Carte();
         $carte->setPosition("");
         $carte->setAbscisse(0);
@@ -80,7 +82,7 @@ class MapController extends AbstractController
 
 
     // MapMaker : update les élements de la map
-    #[Route("/map/update", name:"update_map")]
+    #[Route("/map/update", name:"update_map", methods: ["POST"])]
     public function updateMap(
         Request                     $request,
         CarteCarreauRepository      $carteCarreauRepository,
@@ -109,7 +111,7 @@ class MapController extends AbstractController
                     $carteCarreauEntity->setIsWrap(true);
                     $carteCarreauEntity->setTargetWrap($updatedCase['targetWrap']);
                     $carteCarreauEntity->setTargetMapId($updatedCase['targetMapId']);
-                    $wrap = $wrapRepository->find(1);
+                    $wrap = $wrapRepository->find(GameContent::DEFAULT_WRAP_ID);
                     $carteCarreauEntity->setWrap($wrap);
                 }
 
@@ -140,14 +142,14 @@ class MapController extends AbstractController
     }
 
     //MapMaker : update les élements de la map
-    #[Route("/map/cases/infos", name:"map_cases_infos")]
+    #[Route("/map/cases/infos", name:"map_cases_infos", methods: ["POST"])]
     public function getCasesInfoForSelect(Request $request, CarteCarreauRepository $carteCarreauRepository): Response {
         $data = json_decode($request->getContent(), true);
         $mapId = $data['mapId'];
 
         $casesInfos = $carteCarreauRepository->getCasesInfoForSelect($mapId);
 
-        return new Response(json_encode($casesInfos));
+        return new JsonResponse($casesInfos);
     }
 
 }

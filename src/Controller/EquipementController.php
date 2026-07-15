@@ -14,6 +14,7 @@ use App\Repository\RarityRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -23,7 +24,7 @@ class EquipementController extends AbstractController
 {
     public function __construct(){}
 
-    #[Route("/equipement/create", name:"equipement_create")]
+    #[Route("/equipement/create", name:"equipement_create", methods: ["POST"])]
     public function createEquipement(
         CreateEquipementDTO                 $createEquipementDTO,
         EntityManagerInterface              $entityManager,
@@ -92,7 +93,7 @@ class EquipementController extends AbstractController
         return new Response('');
     }
 
-    #[Route("/equipement/formelements", name:"equipement_form_elements")]
+    #[Route("/equipement/formelements", name:"equipement_form_elements", methods: ["POST"])]
     public function getFormElementsEquipement(
         PositionEquipementRepository $positionEquipementRepository,
         RarityRepository             $rarityRepository,
@@ -114,10 +115,10 @@ class EquipementController extends AbstractController
 
 
 
-        return new Response(json_encode($formElements));
+        return new JsonResponse($formElements);
     }
 
-    #[Route("/equipements", name:"all_equipements")]
+    #[Route("/equipements", name:"all_equipements", methods: ["POST"])]
     public function getAllEquipements(EquipementRepository $equipementRepository): Response {
         $equipements = $equipementRepository->findAll();
         $equipementsNormalized = [];
@@ -130,26 +131,26 @@ class EquipementController extends AbstractController
             ];
         }
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'equipements' => $equipementsNormalized
-        ]));
+        ]);
     }
 
 
-    #[Route("/equipements/grouped", name:"all_equipements_grouped")]
+    #[Route("/equipements/grouped", name:"all_equipements_grouped", methods: ["POST"])]
     public function getAllEquipementsGrouped(EquipementRepository $equipementRepository){
         $groupedEquipements = $equipementRepository->getAllEquipementGroupedByPosition();
-        return new Response(json_encode($groupedEquipements ));
+        return new JsonResponse($groupedEquipements );
     }
 
-    #[Route("/equipements/info", name:"all_equipements_grouped")]
+    #[Route("/equipements/info", name:"all_equipements_info", methods: ["POST"])]
     public function getAllEquipementsAndStats(EquipementRepository $equipementRepository, EquipementCaracteristiqueRepository $equipementCaracteristiqueRepository){
         $equipements = $equipementRepository->getAllEquipementGroupedByPosition();
         foreach ($equipements as &$equipement){
             $caracteristiques = $equipementCaracteristiqueRepository->getAllCaracteristiquesByIdEquipement($equipement['id']);
             $equipement['caracteristiques'] = $caracteristiques;
         }
-        return new Response(json_encode($equipements));
+        return new JsonResponse($equipements);
     }
 }
 

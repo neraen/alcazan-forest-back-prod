@@ -35,19 +35,15 @@ class WrapService
 
     private function didPlayerKilledBoss(User $user, int $bossId): array {
         $userBossEntity = $this->userBossRepository->findOneBy(['user' => $user->getId(), 'boss' => $bossId]);
-        $dateTimeNow = new \DateTime('now');
-
-        $interval = $dateTimeNow->getTimestamp() - $userBossEntity->getLastKill()->getTimestamp();
 
         if(is_null($userBossEntity)){
-            $authorization = false;
-        }else{
-            if($interval < 10800){
-                $authorization = true;
-            }else{
-                $authorization = false;
-            }
+            return ['authorization' => false,
+                    'message' => "Vous devez battre le gardien avant d'acceder à la salle aux trésors"];
         }
+
+        $dateTimeNow = new \DateTime('now');
+        $interval = $dateTimeNow->getTimestamp() - $userBossEntity->getLastKill()->getTimestamp();
+        $authorization = $interval < 10800;
 
         $bossName = $userBossEntity->getBoss()->getName();
         return ['authorization' => $authorization,

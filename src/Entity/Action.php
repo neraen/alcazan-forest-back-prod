@@ -2,11 +2,18 @@
 
 namespace App\Entity;
 
+use App\Enum\ActionType;
+use App\Enum\QuestEffect;
 use App\Repository\ActionRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
+/**
+ * Bouton d'une séquence de quête (ou d'une case de carte via CarteCarreau.action).
+ * Le comportement est déterminé par $actionType ; les effets scriptés
+ * (SCRIPTED_EFFECT) sont exécutés côté serveur via QuestEffectRegistry.
+ */
 #[ORM\Entity(repositoryClass: ActionRepository::class)]
 class Action
 {
@@ -18,20 +25,20 @@ class Action
     #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
-    #[ORM\Column(type: 'string', length: 255)]
-    private $api_link;
-
-    #[ORM\Column(type: 'string', nullable: true)]
-    private $params;
-
     #[ORM\OneToMany(mappedBy: 'action', targetEntity: SequenceAction::class)]
     private $sequenceActions;
 
     #[ORM\OneToMany(mappedBy: 'action', targetEntity: CarteCarreau::class)]
     private $carteCarreaus;
 
-    #[ORM\ManyToOne(targetEntity: ActionType::class, inversedBy: 'actions')]
+    #[ORM\Column(type: 'integer', enumType: ActionType::class)]
     private $actionType;
+
+    #[ORM\Column(type: 'string', length: 64, nullable: true, enumType: QuestEffect::class)]
+    private $effect;
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    private $effectParams;
 
     #[ORM\ManyToOne(targetEntity: Objet::class, inversedBy: 'actions')]
     private $objet;
@@ -85,26 +92,26 @@ class Action
         return $this;
     }
 
-    public function getApiLink(): ?string
+    public function getEffect(): ?QuestEffect
     {
-        return $this->api_link;
+        return $this->effect;
     }
 
-    public function setApiLink(string $api_link): self
+    public function setEffect(?QuestEffect $effect): self
     {
-        $this->api_link = $api_link;
+        $this->effect = $effect;
 
         return $this;
     }
 
-    public function getParams(): ?string
+    public function getEffectParams(): ?array
     {
-        return $this->params;
+        return $this->effectParams;
     }
 
-    public function setParams(?string $params): self
+    public function setEffectParams(?array $effectParams): self
     {
-        $this->params = $params;
+        $this->effectParams = $effectParams;
 
         return $this;
     }
@@ -174,7 +181,7 @@ class Action
         return $this->actionType;
     }
 
-    public function setActionType(?ActionType $actionType): self
+    public function setActionType(ActionType $actionType): self
     {
         $this->actionType = $actionType;
 

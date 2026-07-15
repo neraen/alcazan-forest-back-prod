@@ -5,7 +5,12 @@ namespace App\Entity;
 use App\Repository\UserQueteRepository;
 use Doctrine\ORM\Mapping as ORM;
 
+/**
+ * Progression d'un joueur sur une quête : pointeur vers la séquence
+ * courante + drapeau de complétion. Une seule ligne par (user, quete).
+ */
 #[ORM\Entity(repositoryClass: UserQueteRepository::class)]
+#[ORM\UniqueConstraint(name: 'uniq_user_quete', columns: ['user_id', 'quete_id'])]
 class UserQuete
 {
     #[ORM\Id]

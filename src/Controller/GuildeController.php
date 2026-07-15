@@ -6,6 +6,7 @@ use App\Repository\GuildeRepository;
 use App\Repository\JoueurGuildeRepository;
 use App\Repository\NiveauJoueurRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -15,30 +16,40 @@ class GuildeController extends AbstractController{
 
     public function __construct(){}
 
-    #[Route("/guildes/player/check", name:"guildes_player_check")]
+    #[Route("/guildes/player/check", name:"guildes_player_check", methods: ["POST"])]
     public function checkIfPlayerCanJoinGuilde(GuildeRepository $guildeRepository): Response {
         $user = $this->getUser();
 
+        if($user->getAlignement() === null){
+            return new JsonResponse([
+                'message' => "Vous devez choisir un alignement avant de rejoindre une guilde"
+            ]);
+        }
+
         $guildeRepository->getAllGuildesForPlayer($user->getAlignement()->getId());
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'message' => "Vous entrez dans votre chambre d'auberge"
-        ]));
+        ]);
     }
 
-    #[Route("/guildes/player", name:"guildes_player")]
+    #[Route("/guildes/player", name:"guildes_player", methods: ["POST"])]
     public function getAllGuildesForPlayer(GuildeRepository $guildeRepository): Response {
         $user = $this->getUser();
 
+        if($user->getAlignement() === null){
+            return new JsonResponse(['guildes' => []]);
+        }
+
         $guildes = $guildeRepository->getAllGuildesForPlayer($user->getAlignement()->getId());
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'guildes' => $guildes
-        ]));
+        ]);
     }
 
 
-    #[Route("/guilde/infos", name:"guilde_infos")]
+    #[Route("/guilde/infos", name:"guilde_infos", methods: ["POST"])]
     public function getGuildeInfos(JoueurGuildeRepository $joueurGuildeRepository, NiveauJoueurRepository $niveauJoueurRepository): Response {
         $user = $this->getUser();
         $guilde = $user->getGuilde();
@@ -55,10 +66,10 @@ class GuildeController extends AbstractController{
             $message = "Vous n'avez pas de guilde.";
         }
 
-        return new Response(json_encode([
+        return new JsonResponse([
             'message' => $message,
             'joueurs' => $joueurs ?? [],
             'infos' => $guildeInfos ?? []
-        ]));
+        ]);
     }
 }

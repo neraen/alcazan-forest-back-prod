@@ -4,7 +4,6 @@ namespace App\Repository;
 
 use App\Entity\Sequence;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\ORM\AbstractQuery;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -19,12 +18,4 @@ class SequenceRepository extends ServiceEntityRepository
     {
         parent::__construct($registry, Sequence::class);
     }
-
-    public function getAllPnjSequence($pnjId){
-        return $this->createQueryBuilder('sequence')
-            ->where('sequence.pnj = '.$pnjId)
-            ->getQuery()
-            ->getResult(AbstractQuery::HYDRATE_ARRAY);
-    }
-
 }

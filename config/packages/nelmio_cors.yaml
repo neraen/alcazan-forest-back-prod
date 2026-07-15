@@ -1,16 +1,12 @@
 nelmio_cors:
     defaults:
         origin_regex: true
-        allow_origin: ['*']
+        # Origines autorisées : pilotées par CORS_ALLOW_ORIGIN (.env / docker-compose).
+        # Plus de wildcard '*' : localhost/127.0.0.1 uniquement par défaut.
+        allow_origin: ['%env(CORS_ALLOW_ORIGIN)%']
         allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
-        allow_headers: ['Content-Type', 'Authorization', 'Access-Control-Allow-Origin']
+        allow_headers: ['Content-Type', 'Authorization']
         expose_headers: ['Link']
         max_age: 3600
     paths:
-        '^/api/':
-            origin_regex: true
-            allow_origin: [ '*' ]
-            allow_methods: [ 'GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE' ]
-            allow_headers: [ 'Content-Type', 'Authorization', 'Access-Control-Allow-Origin']
-            expose_headers: [ 'Link' ]
-            max_age: 3600
+        '^/api/': ~

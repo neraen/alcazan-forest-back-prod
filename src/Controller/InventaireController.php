@@ -17,6 +17,7 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -26,7 +27,7 @@ class InventaireController extends AbstractController
 {
     public function __construct(){}
 
-    #[Route("/inventaire", name:"inventaire")]
+    #[Route("/inventaire", name:"inventaire", methods: ["POST"])]
     public function getPlayerInventaire(
         InventaireRepository                $inventaireRepository,
         InventaireEquipementRepository      $inventaireEquipementRepository,
@@ -52,13 +53,11 @@ class InventaireController extends AbstractController
         }
 
         $data = ['equipements' => $equipements, 'objets' => $objets, 'consommables' => $consommables];
-        $json = json_encode($data);
-
-        return new Response($json);
+        return new JsonResponse($data);
     }
 
 
-    #[Route("/inventaire/equipement/equipe", name:"inventaire_equipement_equipe")]
+    #[Route("/inventaire/equipement/equipe", name:"inventaire_equipement_equipe", methods: ["POST"])]
     public function getPlayerEquipementEquipe(
         UserEquipementRepository            $userEquipementRepository,
         EquipementCaracteristiqueRepository $equipementCaracteristiqueRepository
@@ -72,13 +71,11 @@ class InventaireController extends AbstractController
             $equipement['caracteristiques'] = $caracterisitques;
         }
 
-        $json = json_encode($equipements);
-
-        return new Response($json);
+        return new JsonResponse($equipements);
     }
 
 
-    #[Route("/inventaire/equipement/unwear", name:"inventaire_equipement_unwear")]
+    #[Route("/inventaire/equipement/unwear", name:"inventaire_equipement_unwear", methods: ["POST"])]
     public function unwearEquipement(
         Request                                 $request,
         UserEquipementRepository                $userEquipementRepository,
@@ -130,7 +127,7 @@ class InventaireController extends AbstractController
     }
 
 
-    #[Route("/inventaire/equipement/wear", name:"inventaire_equipement_wear")]
+    #[Route("/inventaire/equipement/wear", name:"inventaire_equipement_wear", methods: ["POST"])]
     public function wearEquipement(
         Request                                 $request,
         UserEquipementRepository                $userEquipementRepository,

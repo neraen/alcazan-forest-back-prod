@@ -13,12 +13,14 @@ use App\Repository\CarteCarreauRepository;
 use App\Repository\CarteRepository;
 use App\Repository\ClasseRepository;
 use App\Repository\NiveauRepository;
-use Doctrine\Common\EventSubscriber;
-use Doctrine\ORM\Event\LifecycleEventArgs;
+use App\Config\GameContent;
+use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;
+use Doctrine\ORM\Event\PostPersistEventArgs;
 use Doctrine\ORM\Events;
 use Doctrine\ORM\EntityManagerInterface;
 
-class PostRegisterSubscriber implements EventSubscriber
+#[AsDoctrineListener(event: Events::postPersist)]
+class PostRegisterSubscriber
 {
     private $entityManager;
     private $niveauRepository;
@@ -43,14 +45,7 @@ class PostRegisterSubscriber implements EventSubscriber
         $this->caracteristiqueRepository = $caracteristiqueRepository;
     }
 
-    public function getSubscribedEvents()
-    {
-        return [
-            Events::postPersist,
-        ];
-    }
-
-    public function postPersist(LifecycleEventArgs $args)
+    public function postPersist(PostPersistEventArgs $args)
     {
         $entity = $args->getObject();
 
@@ -73,10 +68,10 @@ class PostRegisterSubscriber implements EventSubscriber
         $user->setRestePointCarac(0);
         $user->setTutorialActive(true);
 
-        $firstMap = $this->carteRepository->findOneBy(['id' => 2]);
+        $firstMap = $this->carteRepository->find(GameContent::SPAWN_MAP_ID);
         $user->setMap($firstMap);
-        $user->setCaseAbscisse(9);
-        $user->setCaseOrdonnee(9);
+        $user->setCaseAbscisse(GameContent::SPAWN_ABSCISSE);
+        $user->setCaseOrdonnee(GameContent::SPAWN_ORDONNEE);
 
         // Initialisation du niveau joueur
         $niveauJoueur = new NiveauJoueur();
@@ -87,7 +82,7 @@ class PostRegisterSubscriber implements EventSubscriber
         $this->entityManager->persist($niveauJoueur);
 
         // Initialisation de la classe
-        $classe = $this->classeRepository->findOneBy(['id' => 3]);
+        $classe = $this->classeRepository->find(GameContent::DEFAULT_CLASSE_ID);
         $user->setClasse($classe);
         $this->entityManager->persist($user);
 
@@ -98,7 +93,7 @@ class PostRegisterSubscriber implements EventSubscriber
         $this->entityManager->persist($inventaire);
 
         // Initialisation des caractéristiques du joueur
-        for ($indexCaracteristique = 1; $indexCaracteristique <= 6; $indexCaracteristique++) {
+        foreach (GameContent::CARACTERISTIQUE_IDS as $indexCaracteristique) {
             $joueurCaracteristique = new JoueurCaracteristique();
             $joueurCaracteristiqueBonus = new JoueurCaracteristiqueBonus();
             $caracteristique = $this->caracteristiqueRepository->findOneBy(['id' => $indexCaracteristique]);
@@ -116,9 +111,13 @@ class PostRegisterSubscriber implements EventSubscriber
             $this->entityManager->persist($joueurCaracteristiqueBonus);
         }
 
-        // Placer le joueur sur la première carte
-        $firstMap = $this->carteRepository->findOneBy(['id' => 1]);
-        $this->carteCarreauRepository->setPlayerOnCaseInAMap($firstMap->getId(), 10, 10, $user->getId());
+        // Placer le joueur sur sa case de spawn (même carte/case que user.map ci-dessus)
+        $this->carteCarreauRepository->setPlayerOnCaseInAMap(
+            GameContent::SPAWN_MAP_ID,
+            GameContent::SPAWN_ABSCISSE,
+            GameContent::SPAWN_ORDONNEE,
+            $user->getId()
+        );
 
         // Persist tous les changements
         $this->entityManager->flush();

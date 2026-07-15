@@ -24,10 +24,10 @@ class Caracteristique
     #[ORM\OneToMany(mappedBy: 'caracteristique', targetEntity: EquipementCaracteristique::class)]
     private $equipementCaracteristiques;
 
-    #[ORM\OneToMany(mappedBy: 'Caracteristique', targetEntity: JoueurCaracteristiqueBonus::class)]
+    #[ORM\OneToMany(mappedBy: 'caracteristique', targetEntity: JoueurCaracteristiqueBonus::class)]
     private $joueurCaracteristiqueBonuses;
 
-    #[ORM\OneToMany(mappedBy: 'Caracteristique', targetEntity: BuffCaracteristique::class)]
+    #[ORM\OneToMany(mappedBy: 'caracteristique', targetEntity: BuffCaracteristique::class)]
     private $buffCaracteristiques;
 
     public function __construct()

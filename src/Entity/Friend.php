@@ -18,7 +18,7 @@ class Friend
     private $user1;
 
     #[ORM\JoinColumn(nullable: false)]
-    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'friends')]
+    #[ORM\ManyToOne(targetEntity: User::class)]
     private $user2;
 
     public function getId(): ?int

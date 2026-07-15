@@ -17,7 +17,7 @@
 /phpunit.xml
 ###< symfony/phpunit-bridge ###
 ###> lexik/jwt-authentication-bundle ###
-#/config/jwt/*.pem
+/config/jwt/*.pem
 ###< lexik/jwt-authentication-bundle ###
 
 
@@ -30,3 +30,4 @@ phpstan.neon
 /.php-cs-fixer.php
 /.php-cs-fixer.cache
 ###< friendsofphp/php-cs-fixer ###
+/.env.test.local

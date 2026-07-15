@@ -21,6 +21,7 @@ use App\service\WrapService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -32,7 +33,7 @@ class JoueurController extends AbstractController
     public function __construct(){}
 
 
-    #[Route("/joueur/disable/tutorial", name:"joueur_disable_tutorial")]
+    #[Route("/joueur/disable/tutorial", name:"joueur_disable_tutorial", methods: ["POST"])]
     public function disableTutorial(EntityManagerInterface $entityManager): Response
     {
         $user = $this->getUser();
@@ -44,7 +45,7 @@ class JoueurController extends AbstractController
     }
 
 
-    #[Route("/joueur/data/minimal", name:"joueur_data_minimal")]
+    #[Route("/joueur/data/minimal", name:"joueur_data_minimal", methods: ["POST"])]
     public function getMinimalPlayerData(
         UserRepository          $userRepository,
         NiveauJoueurRepository  $niveauJoueurRepository,
@@ -55,13 +56,11 @@ class JoueurController extends AbstractController
         $minimalPlayerData['experienceActuelle'] = $experienceAndLevel['experienceActuelle'];
         $minimalPlayerData['experienceMax'] = $experienceAndLevel['experienceMax'];
         $minimalPlayerData['niveau'] = $experienceAndLevel['niveau'];
-        $minimalPlayerDataResponse = json_encode($minimalPlayerData);
-
-        return new Response($minimalPlayerDataResponse);
+        return new JsonResponse($minimalPlayerData);
     }
 
 
-    #[Route("/joueur/spells", name:"joueur_spells")]
+    #[Route("/joueur/spells", name:"joueur_spells", methods: ["POST"])]
     public function getPlayerSpells(
         SortilegeRepository        $sortilegeRepository,
         NiveauJoueurRepository     $niveauJoueurRepository,
@@ -80,12 +79,10 @@ class JoueurController extends AbstractController
             return $spell['niveau'] <= $userLevel;
         });
 
-        $playerSpellsResponse = json_encode($playerSpellsAllowed);
-
-        return new Response($playerSpellsResponse);
+        return new JsonResponse($playerSpellsAllowed);
     }
 
-    #[Route("/joueur/profil/spells", name:"joueur_profil_spells")]
+    #[Route("/joueur/profil/spells", name:"joueur_profil_spells", methods: ["POST"])]
     public function getPlayerProfilSpells(
         UserSortilegeRepository    $userSortilegeRepository,
         SortilegeRepository        $sortilegeRepository,
@@ -108,23 +105,19 @@ class JoueurController extends AbstractController
             return $spell['niveau'] <= $userLevel;
         });
 
-        $playerSpellsResponse = json_encode($playerSpellsAllowed);
-
-        return new Response($playerSpellsResponse);
+        return new JsonResponse($playerSpellsAllowed);
     }
 
 
-    #[Route("/joueur/consommables", name:"joueur_consommables")]
+    #[Route("/joueur/consommables", name:"joueur_consommables", methods: ["POST"])]
     public function getPlayerConsommables(UserConsommableRepository $userConsommableRepository): Response
     {
         $playerConsommables = $userConsommableRepository->getUserEquipedConsommable($this->getUser()->getId());
-        $playerConsommablesResponse = json_encode($playerConsommables);
-
-        return new Response($playerConsommablesResponse);
+        return new JsonResponse($playerConsommables);
     }
 
 
-    #[Route("/joueur/case/update_position", name:"update_case_position")]
+    #[Route("/joueur/case/update_position", name:"update_case_position", methods: ["POST"])]
     public function updateCasePosition(
         Request                 $request,
         CarteCarreauRepository  $carteCarreauRepository,
@@ -159,12 +152,10 @@ class JoueurController extends AbstractController
         $returnMapInfo['abscisseJoueur'] = $user->getCaseAbscisse();
         $returnMapInfo['ordonneeJoueur'] = $user->getCaseOrdonnee();
 
-        $json = json_encode($returnMapInfo);
-
-        return new Response($json);
+        return new JsonResponse($returnMapInfo);
     }
 
-    #[Route("/joueur/map/update_position", name:"update_map_position")]
+    #[Route("/joueur/map/update_position", name:"update_map_position", methods: ["POST"])]
     public function updateMapPosition(
         Request                 $request,
         WrapService             $wrapService,
@@ -220,15 +211,13 @@ class JoueurController extends AbstractController
         return new Response($json);
     }
 
-    #[Route("/joueur/experience", name:"get_exp_joueur")]
+    #[Route("/joueur/experience", name:"get_exp_joueur", methods: ["POST"])]
     public function getExpJoueur(NiveauJoueurRepository $niveauJoueurRepository): Response{
         $returnExpInfo = $niveauJoueurRepository->getNiveauAndExperience($this->getUser()->getId());
-        $experienceJoueurData = json_encode($returnExpInfo);
-
-        return new Response($experienceJoueurData);
+        return new JsonResponse($returnExpInfo);
     }
 
-    #[Route("/joueur/caracteristiques", name:"get_caracteristiques_joueur")]
+    #[Route("/joueur/caracteristiques", name:"get_caracteristiques_joueur", methods: ["GET", "POST"])]
     public function getCaracteristiquesJoueur(
         JoueurCaracteristiqueRepository $joueurCaracteristiqueRepository,
         NiveauJoueurRepository          $niveauJoueurRepository
@@ -242,12 +231,10 @@ class JoueurController extends AbstractController
         $maxCaracsAllowed = ($levelJoueur * 5) + 6;
         $caracteristiquesInfo['maxCaracsAllowed'] = $maxCaracsAllowed;
 
-        $jsonCaracteristiques = json_encode($caracteristiquesInfo);
-
-        return new Response($jsonCaracteristiques);
+        return new JsonResponse($caracteristiquesInfo);
     }
 
-    #[Route("/joueur/caracteristiques/update", name:"update_caracteristiques_joueur")]
+    #[Route("/joueur/caracteristiques/update", name:"update_caracteristiques_joueur", methods: ["POST"])]
     public function updateCaracteristiques(
         Request $request,
         JoueurCaracteristiqueRepository         $joueurCaracteristiqueRepository,
@@ -256,13 +243,24 @@ class JoueurController extends AbstractController
         NiveauJoueurRepository                  $niveauJoueurRepository,
         EntityManagerInterface                  $entityManager
     ): Response {
+        $user = $this->getUser();
         $caracteristiques = json_decode($request->getContent());
+        $levelJoueur = $niveauJoueurRepository->getPlayerLevel($user->getId());
+
+        // Vérification serveur du plafond de points : niveau * 5 + 6 (anti-triche)
+        $maxCaracsAllowed = ((int)$levelJoueur * 5) + 6;
+        $totalPointsRequested = 0;
+        foreach ($caracteristiques as $value){
+            $totalPointsRequested += (int)$value;
+        }
+        if($totalPointsRequested > $maxCaracsAllowed){
+            return new JsonResponse("Vous n'avez pas assez de points de caractéristiques disponibles", 400);
+        }
+
         foreach ($caracteristiques as $name => $value){
             $caracteristiqueId = $caracteristiqueRepository->findOneBy(['nom' => $name])->getId();
-            $joueurCaracteristiqueRepository->updateCaracteristique($this->getUser(), $caracteristiqueId, $value);
+            $joueurCaracteristiqueRepository->updateCaracteristique($user, $caracteristiqueId, $value);
             if($name === "constitution"){
-                $user = $this->getUser();
-                $levelJoueur = $niveauJoueurRepository->getPlayerLevel($this->getUser()->getId());
                 $caracteristiquesBonus = $joueurCaracteristiqueBonusRepository->findOneBy(['caracteristique' => $caracteristiqueId, 'joueur' => $user->getId()])->getPoints();
                 $maxLife = 400 + (($value+$caracteristiquesBonus) * 5) + ((int)$levelJoueur * 8);
                 $user->setMaxLife($maxLife);
@@ -271,13 +269,10 @@ class JoueurController extends AbstractController
             }
         }
 
-        $newCaracteristiques = $joueurCaracteristiqueRepository->getJoueurCaracteristiques($user->getId());
-        $newCaracteristiquesJson = json_encode("Vos caractéristiques ont bien été mise à jour");
-
-        return new Response($newCaracteristiquesJson);
+        return new JsonResponse("Vos caractéristiques ont bien été mise à jour");
     }
 
-    #[Route("/joueur/buffs", name:"joueur_buffs")]
+    #[Route("/joueur/buffs", name:"joueur_buffs", methods: ["POST"])]
     public function getActivePlayerBuff(
         UserBuffRepository              $userBuffRepository,
         BuffCaracteristiqueRepository   $buffCaracteristiqueRepository
@@ -290,21 +285,21 @@ class JoueurController extends AbstractController
                 $buff['caracteristiques'] = $caracteristiques;
             }
         }
-        return new Response(json_encode($buffs));
+        return new JsonResponse($buffs);
     }
 
 
-    #[Route("/joueur/data/profil", name:"joueur_data_profil")]
+    #[Route("/joueur/data/profil", name:"joueur_data_profil", methods: ["POST"])]
     public function getDataJoueurForProfil(Request $request, UserRepository $userRepository): Response {
         $data = json_decode($request->getContent(), true);
         $pseudo = $data['pseudo'];
 
         $userProfilInfos = $userRepository->getDataForProfil($pseudo);
 
-        return new Response(json_encode($userProfilInfos));
+        return new JsonResponse($userProfilInfos);
     }
 
-    #[Route("/joueur/isfriend", name:"joueur_get_is_friend")]
+    #[Route("/joueur/isfriend", name:"joueur_get_is_friend", methods: ["POST"])]
     public function getIsFriend(Request $request, UserRepository $userRepository, FriendRepository $friendRepository): Response {
         $data = json_decode($request->getContent(), true);
         $dataUserId = $data['userId'];
@@ -316,17 +311,17 @@ class JoueurController extends AbstractController
             $isFriend = $friendRepository->findOneBy(['user1' => $user2->getId(), 'user2' => $user1->getId()]);
         }
 
-        return new Response(json_encode(['friendId' => $isFriend->getId() ?? 0]));
+        return new JsonResponse(['friendId' => $isFriend?->getId() ?? 0]);
     }
 
 //
-//    #[Route("/joueur/spells", name:"joueur_spells")]
+//    #[Route("/joueur/spells", name:"joueur_spells", methods: ["POST"])]
 //
 //    public function getAllSpells(Request $request){
 //        $user = $this->getUser();
 //
 //
-//        return new Response(json_encode([]));
+//        return new JsonResponse([]);
 //    }
 
 

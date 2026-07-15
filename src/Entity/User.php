@@ -44,7 +44,7 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     #[ORM\OneToMany(mappedBy: "user", targetEntity: JoueurCaracteristique::class)]
     private $joueurCaracteristiques;
 
-    #[ORM\OneToMany(mappedBy: "user", targetEntity: NiveauJoueur::class)]
+    #[ORM\OneToOne(mappedBy: "user", targetEntity: NiveauJoueur::class)]
     private $niveauJoueur;
 
     #[ORM\ManyToOne(targetEntity: Guilde::class, inversedBy: "users")]
@@ -97,12 +97,6 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
 
     #[ORM\OneToOne(targetEntity: CarteCarreau::class, mappedBy: "joueur", cascade: ["persist", "remove"])]
     private $carteCarreau;
-
-    #[ORM\OneToMany(targetEntity: JoueurDialogue::class, mappedBy: "joueur")]
-    private $joueurDialogues;
-
-    #[ORM\OneToMany(targetEntity: UserSequence::class, mappedBy: "user")]
-    private $userSequences;
 
     #[ORM\OneToMany(targetEntity: UserQuete::class, mappedBy: "user")]
     private $userQuetes;
@@ -167,8 +161,6 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     public function __construct()
     {
         $this->joueurCaracteristiques = new ArrayCollection();
-        $this->joueurDialogues = new ArrayCollection();
-        $this->userSequences = new ArrayCollection();
         $this->userQuetes = new ArrayCollection();
         $this->userEquipements = new ArrayCollection();
         $this->joueurCaracteristiqueBonuses = new ArrayCollection();
@@ -552,66 +544,6 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
         }
 
         $this->carteCarreau = $carteCarreau;
-
-        return $this;
-    }
-
-    /**
-     * @return Collection|JoueurDialogue[]
-     */
-    public function getJoueurDialogues(): Collection
-    {
-        return $this->joueurDialogues;
-    }
-
-    public function addJoueurDialogue(JoueurDialogue $joueurDialogue): self
-    {
-        if (!$this->joueurDialogues->contains($joueurDialogue)) {
-            $this->joueurDialogues[] = $joueurDialogue;
-            $joueurDialogue->setJoueur($this);
-        }
-
-        return $this;
-    }
-
-    public function removeJoueurDialogue(JoueurDialogue $joueurDialogue): self
-    {
-        if ($this->joueurDialogues->removeElement($joueurDialogue)) {
-            // set the owning side to null (unless already changed)
-            if ($joueurDialogue->getJoueur() === $this) {
-                $joueurDialogue->setJoueur(null);
-            }
-        }
-
-        return $this;
-    }
-
-    /**
-     * @return Collection|UserSequence[]
-     */
-    public function getUserSequences(): Collection
-    {
-        return $this->userSequences;
-    }
-
-    public function addUserSequence(UserSequence $userSequence): self
-    {
-        if (!$this->userSequences->contains($userSequence)) {
-            $this->userSequences[] = $userSequence;
-            $userSequence->setUser($this);
-        }
-
-        return $this;
-    }
-
-    public function removeUserSequence(UserSequence $userSequence): self
-    {
-        if ($this->userSequences->removeElement($userSequence)) {
-            // set the owning side to null (unless already changed)
-            if ($userSequence->getUser() === $this) {
-                $userSequence->setUser(null);
-            }
-        }
 
         return $this;
     }

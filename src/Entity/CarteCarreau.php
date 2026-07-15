@@ -16,7 +16,7 @@ class CarteCarreau
     #[ORM\Column(type: 'integer')]
     private $id;
 
-    #[ORM\ManyToOne(targetEntity: Carte::class, inversedBy: 'carteCarreaus')]
+    #[ORM\ManyToOne(targetEntity: Carte::class, inversedBy: 'carteCarreaux')]
     private $carte;
 
     #[ORM\ManyToOne(targetEntity: Carreau::class, inversedBy: 'carteCarreaux')]
