@@ -35,7 +35,7 @@ class JoueurGuildeRepository extends ServiceEntityRepository
 
     public function getAllPlayerOfAGuilde($guildeId){
         return $this->createQueryBuilder('jg')
-            ->select('user.pseudo', 'jg.grade', 'classe.nom as classeName')
+            ->select('user.id AS userId', 'user.pseudo', 'jg.grade', 'classe.nom as classeName')
             ->leftJoin('jg.user', 'user' )
             ->leftJoin('user.classe', 'classe')
             ->where('jg.guilde = '.$guildeId)

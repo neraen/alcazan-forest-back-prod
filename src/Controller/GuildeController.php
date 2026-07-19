@@ -58,9 +58,18 @@ class GuildeController extends AbstractController{
         if($guilde){
             $joueurs = $joueurGuildeRepository->getAllPlayerOfAGuilde($guilde->getId());
             foreach($joueurs as &$joueur){
-                $joueur['niveau'] = $niveauJoueurRepository->getPlayerLevel($user->getId());
+                // Le niveau de CHAQUE membre (l'ancien code renvoyait celui de l'appelant)
+                $joueur['niveau'] = $niveauJoueurRepository->getPlayerLevel($joueur['userId']);
             }
-            $guildeInfos = [];
+            unset($joueur);
+
+            $guildeInfos = [
+                'nom' => $guilde->getNom(),
+                'description' => $guilde->getDescription(),
+                'niveau' => $guilde->getNiveau(),
+                'icone' => $guilde->getIcone(),
+                'placeMax' => $guilde->getPlaceMax(),
+            ];
 
         }else{
             $message = "Vous n'avez pas de guilde.";
