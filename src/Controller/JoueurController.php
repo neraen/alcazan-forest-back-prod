@@ -2,11 +2,18 @@
 
 namespace App\Controller;
 
+use App\DTO\Spell\SpellIdDTO;
+use App\DTO\Spell\SpellSlotDTO;
+use App\Entity\UserConsommable;
+use App\Entity\UserSortilege;
 use App\Repository\BuffCaracteristiqueRepository;
 use App\Repository\CaracteristiqueRepository;
 use App\Repository\CarteCarreauRepository;
 use App\Repository\CarteRepository;
+use App\Repository\ConsommableRepository;
 use App\Repository\FriendRepository;
+use App\Repository\InventaireConsommableRepository;
+use App\Repository\InventaireRepository;
 use App\Repository\JoueurCaracteristiqueBonusRepository;
 use App\Repository\JoueurCaracteristiqueRepository;
 use App\Repository\NiveauJoueurRepository;
@@ -23,6 +30,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 
 
@@ -60,26 +68,167 @@ class JoueurController extends AbstractController
     }
 
 
+    /**
+     * Sorts affichés sur la barre d'action. Tant que le joueur n'a rien assigné
+     * (aucune ligne user_sortilege), tous les sorts appris sont renvoyés dans
+     * l'ordre historique ; dès qu'il personnalise, seuls les sorts assignés
+     * sont renvoyés, avec leur emplacement (`ordre`, 1-8).
+     */
     #[Route("/joueur/spells", name:"joueur_spells", methods: ["POST"])]
     public function getPlayerSpells(
         SortilegeRepository        $sortilegeRepository,
         NiveauJoueurRepository     $niveauJoueurRepository,
     ): Response {
         $user = $this->getUser();
-        //$playerSpellsOrdered = $userSortilegeRepository->findBy(['user' => $user->getId()]);
+        $book = $this->getAllowedSpellBook($sortilegeRepository, $niveauJoueurRepository);
 
-        //if($playerSpellsOrdered){
-          //  $playerSpells = $playerSpellsOrdered;
-        //}else{
-            $playerSpells = $sortilegeRepository->getSpellsByClassId($user->getClasse()->getId());
-        //}
+        $assigned = array_values(array_filter($book, fn($spell) => $spell['ordre'] !== null));
+        if ($assigned !== []) {
+            usort($assigned, fn($a, $b) => $a['ordre'] <=> $b['ordre']);
+            return new JsonResponse($assigned);
+        }
 
+        return new JsonResponse(array_values($book));
+    }
+
+    /**
+     * Grimoire complet du joueur (sorts appris de sa classe + emplacement assigné).
+     */
+    #[Route("/joueur/spells/book", name:"joueur_spells_book", methods: ["POST"])]
+    public function getPlayerSpellBook(
+        SortilegeRepository        $sortilegeRepository,
+        NiveauJoueurRepository     $niveauJoueurRepository,
+    ): Response {
+        return new JsonResponse(array_values($this->getAllowedSpellBook($sortilegeRepository, $niveauJoueurRepository)));
+    }
+
+    /**
+     * Place un sort appris sur un emplacement (1-8) de la barre de sorts.
+     * À la première personnalisation, la barre actuelle (tous les sorts appris,
+     * dans l'ordre) est matérialisée en base pour ne rien perdre. Si
+     * l'emplacement cible est occupé : échange quand le sort déplacé avait déjà
+     * un emplacement, remplacement sinon. Renvoie le grimoire à jour.
+     */
+    #[Route("/joueur/spell/equip", name:"joueur_spell_equip", methods: ["POST"])]
+    public function equipSpell(
+        #[MapRequestPayload] SpellSlotDTO $dto,
+        SortilegeRepository               $sortilegeRepository,
+        UserSortilegeRepository           $userSortilegeRepository,
+        NiveauJoueurRepository            $niveauJoueurRepository,
+        EntityManagerInterface            $entityManager
+    ): Response {
+        $user = $this->getUser();
+        $spell = $this->findLearnedSpell($dto->spellId, $sortilegeRepository, $niveauJoueurRepository);
+        if ($spell === null) {
+            return new JsonResponse(['message' => "Vous ne connaissez pas ce sortilège."], 400);
+        }
+
+        $this->seedSpellBarIfEmpty($userSortilegeRepository, $sortilegeRepository, $niveauJoueurRepository, $entityManager);
+
+        $current = $userSortilegeRepository->findOneBy(['user' => $user, 'sortilege' => $dto->spellId]);
+        $occupant = $userSortilegeRepository->findOneBy(['user' => $user, 'ordre' => $dto->position]);
+
+        if ($occupant && $occupant->getSortilege()->getId() !== $dto->spellId) {
+            if ($current) {
+                // Échange : l'occupant récupère l'ancien emplacement du sort déplacé.
+                $occupant->setOrdre($current->getOrdre());
+            } else {
+                $entityManager->remove($occupant);
+            }
+        }
+
+        if (!$current) {
+            $current = new UserSortilege();
+            $current->setUser($user);
+            $current->setSortilege($entityManager->getReference(\App\Entity\Sortilege::class, $dto->spellId));
+        }
+        $current->setOrdre($dto->position);
+        $entityManager->persist($current);
+        $entityManager->flush();
+
+        return new JsonResponse(array_values($this->getAllowedSpellBook($sortilegeRepository, $niveauJoueurRepository)));
+    }
+
+    /**
+     * Retire un sort de la barre (il reste dans le grimoire). Renvoie le
+     * grimoire à jour.
+     */
+    #[Route("/joueur/spell/unequip", name:"joueur_spell_unequip", methods: ["POST"])]
+    public function unequipSpell(
+        #[MapRequestPayload] SpellIdDTO $dto,
+        SortilegeRepository             $sortilegeRepository,
+        UserSortilegeRepository         $userSortilegeRepository,
+        NiveauJoueurRepository          $niveauJoueurRepository,
+        EntityManagerInterface          $entityManager
+    ): Response {
+        $user = $this->getUser();
+
+        $this->seedSpellBarIfEmpty($userSortilegeRepository, $sortilegeRepository, $niveauJoueurRepository, $entityManager);
+
+        $current = $userSortilegeRepository->findOneBy(['user' => $user, 'sortilege' => $dto->spellId]);
+        if ($current) {
+            $entityManager->remove($current);
+            $entityManager->flush();
+        }
+
+        return new JsonResponse(array_values($this->getAllowedSpellBook($sortilegeRepository, $niveauJoueurRepository)));
+    }
+
+    /** Grimoire (classe + assignations) filtré par le niveau du joueur. */
+    private function getAllowedSpellBook(
+        SortilegeRepository    $sortilegeRepository,
+        NiveauJoueurRepository $niveauJoueurRepository
+    ): array {
+        $user = $this->getUser();
+        $book = $sortilegeRepository->getSpellBookWithOrder($user->getClasse()->getId(), $user->getId());
         $userLevel = $niveauJoueurRepository->getPlayerLevel($user->getId());
-        $playerSpellsAllowed = array_filter($playerSpells, function($spell) use ($userLevel){
-            return $spell['niveau'] <= $userLevel;
-        });
 
-        return new JsonResponse($playerSpellsAllowed);
+        return array_filter($book, fn($spell) => $spell['niveau'] <= $userLevel);
+    }
+
+    /** Le sort demandé, s'il appartient à la classe du joueur et est débloqué. */
+    private function findLearnedSpell(
+        int                    $spellId,
+        SortilegeRepository    $sortilegeRepository,
+        NiveauJoueurRepository $niveauJoueurRepository
+    ): ?array {
+        foreach ($this->getAllowedSpellBook($sortilegeRepository, $niveauJoueurRepository) as $spell) {
+            if ($spell['id'] === $spellId) {
+                return $spell;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Première personnalisation : matérialise la barre par défaut (tous les
+     * sorts appris, emplacements 1..n) pour que l'assignation ne fasse pas
+     * disparaître les autres sorts.
+     */
+    private function seedSpellBarIfEmpty(
+        UserSortilegeRepository $userSortilegeRepository,
+        SortilegeRepository     $sortilegeRepository,
+        NiveauJoueurRepository  $niveauJoueurRepository,
+        EntityManagerInterface  $entityManager
+    ): void {
+        $user = $this->getUser();
+        if ($userSortilegeRepository->findBy(['user' => $user->getId()]) !== []) {
+            return;
+        }
+
+        $ordre = 1;
+        foreach ($this->getAllowedSpellBook($sortilegeRepository, $niveauJoueurRepository) as $spell) {
+            if ($ordre > 8) {
+                break;
+            }
+            $row = new UserSortilege();
+            $row->setUser($user);
+            $row->setSortilege($entityManager->getReference(\App\Entity\Sortilege::class, $spell['id']));
+            $row->setOrdre($ordre);
+            $entityManager->persist($row);
+            $ordre++;
+        }
+        $entityManager->flush();
     }
 
     #[Route("/joueur/profil/spells", name:"joueur_profil_spells", methods: ["POST"])]
@@ -113,6 +262,69 @@ class JoueurController extends AbstractController
     public function getPlayerConsommables(UserConsommableRepository $userConsommableRepository): Response
     {
         $playerConsommables = $userConsommableRepository->getUserEquipedConsommable($this->getUser()->getId());
+        return new JsonResponse($playerConsommables);
+    }
+
+
+    /**
+     * Place un consommable de l'inventaire sur un des emplacements (1 ou 2) de la
+     * barre de sorts. Upsert : l'emplacement cible reçoit le consommable ; toute
+     * autre occurrence du même consommable est retirée (pas de doublon entre les
+     * deux emplacements). Renvoie la liste équipée à jour pour rafraîchir la barre.
+     */
+    #[Route("/joueur/consommable/equip", name:"joueur_consommable_equip", methods: ["POST"])]
+    public function equipConsommable(
+        Request                         $request,
+        ConsommableRepository           $consommableRepository,
+        UserConsommableRepository       $userConsommableRepository,
+        InventaireRepository            $inventaireRepository,
+        InventaireConsommableRepository $inventaireConsommableRepository,
+        EntityManagerInterface          $entityManager
+    ): Response {
+        $data = json_decode($request->getContent(), true);
+        $position = (int)($data['position'] ?? 0);
+        $consommableId = $data['consommableId'] ?? null;
+
+        if (!in_array($position, [1, 2], true) || $consommableId === null) {
+            return new JsonResponse(['message' => 'Emplacement ou consommable invalide.'], 400);
+        }
+
+        $user = $this->getUser();
+        $consommable = $consommableRepository->find($consommableId);
+        if (!$consommable) {
+            return new JsonResponse(['message' => 'Consommable introuvable.'], 404);
+        }
+
+        // Le joueur doit posséder ce consommable dans son inventaire.
+        $inventaire = $inventaireRepository->findOneBy(['user' => $user->getId()]);
+        $inventaireConsommable = $inventaire
+            ? $inventaireConsommableRepository->findOneBy(['inventaire' => $inventaire->getId(), 'consommable' => $consommableId])
+            : null;
+        if (!$inventaireConsommable) {
+            return new JsonResponse(['message' => "Vous ne possédez pas ce consommable."], 400);
+        }
+
+        // Dédoublonnage : retire ce consommable de tout autre emplacement.
+        $existingSameConsommable = $userConsommableRepository->findBy(['user' => $user, 'consommable' => $consommable]);
+        foreach ($existingSameConsommable as $existing) {
+            if ($existing->getPosition() !== $position) {
+                $entityManager->remove($existing);
+            }
+        }
+
+        // Upsert sur l'emplacement cible.
+        $slot = $userConsommableRepository->findOneBy(['user' => $user, 'position' => $position]);
+        if (!$slot) {
+            $slot = new UserConsommable();
+            $slot->setUser($user);
+            $slot->setPosition($position);
+        }
+        $slot->setConsommable($consommable);
+        $slot->setQuantity($inventaireConsommable->getQuantity());
+        $entityManager->persist($slot);
+        $entityManager->flush();
+
+        $playerConsommables = $userConsommableRepository->getUserEquipedConsommable($user->getId());
         return new JsonResponse($playerConsommables);
     }
 

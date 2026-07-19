@@ -21,7 +21,7 @@ class UserConsommableRepository extends ServiceEntityRepository
 
     public function getUserEquipedConsommable($userId){
         return $this->createQueryBuilder('userConsommable')
-            ->select('consommable.id', 'consommable.nom', 'consommable.icone', 'consommable.cooldown', 'consommable.points')
+            ->select('consommable.id', 'consommable.nom', 'consommable.icone', 'consommable.cooldown', 'consommable.points', 'userConsommable.position')
             ->leftJoin('userConsommable.consommable', 'consommable')
             ->andWhere('userConsommable.user = '.$userId)
             ->orderBy('userConsommable.position')
