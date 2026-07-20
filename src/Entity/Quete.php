@@ -18,6 +18,10 @@ class Quete
     #[ORM\Column(type: 'string', length: 255)]
     private $name;
 
+    /** Accroche affichée sur l'écran d'acceptation, avant de démarrer la quête. */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private $introduction;
+
     #[ORM\OneToMany(mappedBy: 'quete', targetEntity: UserQuete::class)]
     private $userQuetes;
 
@@ -186,6 +190,18 @@ class Quete
     public function setQuete(?self $quete): self
     {
         $this->quete = $quete;
+
+        return $this;
+    }
+
+    public function getIntroduction(): ?string
+    {
+        return $this->introduction;
+    }
+
+    public function setIntroduction(?string $introduction): self
+    {
+        $this->introduction = $introduction;
 
         return $this;
     }

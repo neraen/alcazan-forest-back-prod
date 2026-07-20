@@ -83,7 +83,10 @@ class QuestProgressionService
             return $questInfo + ['status' => 'locked', 'lockedReasons' => $lockedReasons];
         }
 
-        return $questInfo + ['status' => 'available'];
+        return $questInfo + [
+            'status' => 'available',
+            'introduction' => $this->splitParagraphs($quete->getIntroduction()),
+        ];
     }
 
     /**

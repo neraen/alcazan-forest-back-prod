@@ -106,6 +106,7 @@ class QuestEditorService
         return [
             'id' => $quete->getId(),
             'name' => $quete->getName(),
+            'introduction' => $quete->getIntroduction() ?? '',
             'minimalLevel' => $quete->getMinimalLevel() ?? 0,
             'alignementId' => $quete->getAlignement()?->getId() ?? 0,
             'objetId' => $quete->getObjet()?->getId() ?? 0,
@@ -171,6 +172,9 @@ class QuestEditorService
             }
             foreach ($quete->getPnjs() as $pnj) {
                 $pnj->setQuete(null);
+                if ($pnj->getType() === 'quest') {
+                    $pnj->setType('action');
+                }
                 $this->entityManager->persist($pnj);
             }
             $this->entityManager->remove($quete);
@@ -201,6 +205,7 @@ class QuestEditorService
 
         $minimalLevel = (int)($data['minimalLevel'] ?? 0);
         $quete->setName($name);
+        $quete->setIntroduction(trim((string)($data['introduction'] ?? '')) ?: null);
         $quete->setMinimalLevel($minimalLevel > 0 ? $minimalLevel : null);
         $quete->setAlignement($this->findOrNull($this->alignementRepository, (int)($data['alignementId'] ?? 0)));
         $quete->setObjet($this->findOrNull($this->objetRepository, (int)($data['objetId'] ?? 0)));
@@ -233,10 +238,13 @@ class QuestEditorService
 
         $keptSequenceIds = [];
         $firstSequence = null;
+        $usedPnjs = [];
         foreach (array_values($sequencesData) as $index => $sequenceData) {
             $sequence = $this->upsertSequence($quete, $sequenceData, $index + 1);
             $keptSequenceIds[] = $sequence->getId();
             $firstSequence ??= $sequence;
+            $pnj = $sequence->getPnj();
+            $usedPnjs[$pnj->getId()] = $pnj;
         }
 
         foreach ($existingSequences as $id => $sequence) {
@@ -246,7 +254,40 @@ class QuestEditorService
             }
         }
 
+        $this->syncPnjQuestLinks($quete, $usedPnjs);
+
         $this->entityManager->flush();
+    }
+
+    /**
+     * Synchronise le lien retour PNJ -> quête. L'interaction (`GET /api/pnj/
+     * interaction`) route vers la vue quête via `pnj.type` et récupère la quête
+     * portée via `pnj.quete` : chaque PNJ qui tient une séquence doit donc être
+     * marqué `type = 'quest'` et pointer sur cette quête. Les PNJ retirés de la
+     * quête sont détachés pour ne pas rester bloqués sur « ce PNJ ne porte
+     * aucune quête ».
+     *
+     * @param array<int, \App\Entity\Pnj> $usedPnjs PNJ porteurs d'une séquence, indexés par id
+     */
+    private function syncPnjQuestLinks(Quete $quete, array $usedPnjs): void
+    {
+        // Détache les PNJ qui ne portent plus aucune séquence de cette quête.
+        foreach ($quete->getPnjs()->toArray() as $pnj) {
+            if (!isset($usedPnjs[$pnj->getId()])) {
+                $pnj->setQuete(null);
+                if ($pnj->getType() === 'quest') {
+                    $pnj->setType('action');
+                }
+                $this->entityManager->persist($pnj);
+            }
+        }
+
+        // (Re)lie chaque PNJ porteur d'une séquence à cette quête.
+        foreach ($usedPnjs as $pnj) {
+            $pnj->setQuete($quete);
+            $pnj->setType('quest');
+            $this->entityManager->persist($pnj);
+        }
     }
 
     private function upsertSequence(Quete $quete, array $data, int $position): Sequence
