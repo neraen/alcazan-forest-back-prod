@@ -10,25 +10,37 @@ class LevelingService
 {
     public function __construct(private NiveauJoueurRepository $niveauJoueurRepository){}
 
+    // todo : faire une constante partagée (voir aussi addExperienceAndUpLevel)
+    private const MAX_LEVEL = 200;
+
     public function giveExperienceToAPlayer(int $experience, int $userId): array{
         $levelData = $this->niveauJoueurRepository->getNiveauAndExperience($userId);
-        $newExperienceScore = $levelData['experienceActuelle'] + $experience;
+        $experienceByLevel = $this->niveauJoueurRepository->getExperienceByLevel();
 
-        if($newExperienceScore >= $levelData['experienceMax']){
-            $newExperienceScore = $newExperienceScore - $levelData['experienceMax'];
-            // todo : faire une constante
-            if($levelData['niveau'] < 200){
-                $newLevel = $levelData['niveau'] + 1;
-                $this->niveauJoueurRepository->addExperienceAndUpLevel($userId, $newExperienceScore, $newLevel);
-            }
+        $startLevel = (int) $levelData['niveau'];
+        $level = $startLevel;
+        $newExperienceScore = (int) $levelData['experienceActuelle'] + $experience;
 
-        }else{
+        // Consomme le palier de CHAQUE niveau : un gros gain d'XP peut faire monter
+        // plusieurs niveaux d'un seul coup (avant, une seule montée par appel — le
+        // surplus restait dans la barre et un niveau était pris à chaque gain suivant).
+        while ($level < self::MAX_LEVEL
+            && isset($experienceByLevel[$level])
+            && $newExperienceScore >= $experienceByLevel[$level]) {
+            $newExperienceScore -= $experienceByLevel[$level];
+            $level++;
+        }
+
+        if ($level !== $startLevel) {
+            $this->niveauJoueurRepository->addExperienceAndUpLevel($userId, $newExperienceScore, $level);
+        } else {
             $this->niveauJoueurRepository->addExperience($userId, $newExperienceScore);
         }
 
         return [
             'experience' => $newExperienceScore,
-            'level' => $newLevel ?? $levelData['niveau']
+            'level' => $level,
+            'experienceMax' => $experienceByLevel[$level] ?? (int) $levelData['experienceMax'],
         ];
     }
 

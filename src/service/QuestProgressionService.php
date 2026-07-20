@@ -209,7 +209,7 @@ class QuestProgressionService
                 );
             }
 
-            $rewards = $this->giveSequenceReward($user, $sequence);
+            ['rewards' => $rewards, 'playerXp' => $playerXp] = $this->giveSequenceReward($user, $sequence);
             $needRefresh = $needRefresh || $rewards !== [];
 
             $nextSequence = $this->sequenceRepository->findOneBy([
@@ -226,7 +226,8 @@ class QuestProgressionService
                     $questInfo,
                     rewards: $rewards,
                     feedbackMessages: $effectMessages,
-                    needRefresh: $needRefresh
+                    needRefresh: $needRefresh,
+                    playerXp: $playerXp
                 );
             }
 
@@ -239,7 +240,8 @@ class QuestProgressionService
                 $this->buildStepPayload($nextSequence),
                 rewards: $rewards,
                 feedbackMessages: $effectMessages,
-                needRefresh: $needRefresh
+                needRefresh: $needRefresh,
+                playerXp: $playerXp
             );
         });
     }
@@ -386,17 +388,20 @@ class QuestProgressionService
     }
 
     /**
-     * Donne la récompense de la séquence et renvoie les items obtenus
-     * sous forme structurée [{type, label, quantity}] pour le feedback front.
+     * Donne la récompense de la séquence. Renvoie :
+     *  - 'rewards'  : items obtenus [{type, label, quantity}] pour le feedback front ;
+     *  - 'playerXp' : {experience, level, experienceMax} si de l'XP a été donnée
+     *    (pour que le front rafraîchisse la barre/le niveau sans rechargement), sinon null.
      */
     private function giveSequenceReward(User $user, Sequence $sequence): array
     {
         $recompense = $sequence->getRecompense();
         if ($recompense === null) {
-            return [];
+            return ['rewards' => [], 'playerXp' => null];
         }
 
         $rewards = [];
+        $playerXp = null;
         $quantity = max(1, (int)$recompense->getQuantity());
 
         if ($recompense->getEquipement() !== null) {
@@ -420,11 +425,11 @@ class QuestProgressionService
         }
 
         if ($recompense->getExperience() !== null && $recompense->getExperience() > 0) {
-            $this->levelingService->giveExperienceToAPlayer($recompense->getExperience(), $user->getId());
+            $playerXp = $this->levelingService->giveExperienceToAPlayer($recompense->getExperience(), $user->getId());
             $rewards[] = ['type' => 'experience', 'label' => "points d'expérience", 'quantity' => $recompense->getExperience()];
         }
 
-        return $rewards;
+        return ['rewards' => $rewards, 'playerXp' => $playerXp];
     }
 
     private function buildResponse(
@@ -434,7 +439,8 @@ class QuestProgressionService
         array $rewards = [],
         array $blockedMessages = [],
         array $feedbackMessages = [],
-        bool $needRefresh = false
+        bool $needRefresh = false,
+        ?array $playerXp = null
     ): array {
         return [
             'status' => $status,
@@ -446,6 +452,8 @@ class QuestProgressionService
                 'messages' => array_map(fn (string $text) => ['type' => 'info', 'text' => $text], $feedbackMessages),
             ],
             'needRefresh' => $needRefresh,
+            // {experience, level, experienceMax} après un gain d'XP de quête, sinon null.
+            'playerXp' => $playerXp,
         ];
     }
 
