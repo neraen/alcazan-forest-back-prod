@@ -2,6 +2,7 @@
 
 namespace App\service;
 
+use App\Config\GameContent;
 use App\Entity\User;
 use App\Entity\Wrap;
 use App\Repository\NiveauJoueurRepository;
@@ -43,7 +44,7 @@ class WrapService
 
         $dateTimeNow = new \DateTime('now');
         $interval = $dateTimeNow->getTimestamp() - $userBossEntity->getLastKill()->getTimestamp();
-        $authorization = $interval < 10800;
+        $authorization = $interval < GameContent::FENETRE_SALLE_TRESOR_SECONDES;
 
         $bossName = $userBossEntity->getBoss()->getName();
         return ['authorization' => $authorization,

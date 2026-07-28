@@ -11,14 +11,17 @@ use App\Entity\SequenceAction;
 use App\Enum\ActionType;
 use App\Enum\QuestEffect;
 use App\Exception\QuestException;
+use App\Repository\ActionRepository;
 use App\Repository\AlignementRepository;
 use App\Repository\BossRepository;
 use App\Repository\CarteRepository;
 use App\Repository\ConsommableRepository;
 use App\Repository\EquipementRepository;
+use App\Repository\MonstreRepository;
 use App\Repository\ObjetRepository;
 use App\Repository\PnjRepository;
 use App\Repository\QueteRepository;
+use App\Repository\RecetteRepository;
 use App\Repository\UserQueteRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -31,9 +34,13 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 class QuestEditorService
 {
+    /** Cible de branchement « terminer la quête » (au lieu d'une séquence). */
+    private const QUEST_END_KEY = '__END__';
+
     public function __construct(
         private readonly QueteRepository $queteRepository,
         private readonly UserQueteRepository $userQueteRepository,
+        private readonly ActionRepository $actionRepository,
         private readonly PnjRepository $pnjRepository,
         private readonly AlignementRepository $alignementRepository,
         private readonly ObjetRepository $objetRepository,
@@ -41,6 +48,8 @@ class QuestEditorService
         private readonly ConsommableRepository $consommableRepository,
         private readonly BossRepository $bossRepository,
         private readonly CarteRepository $carteRepository,
+        private readonly MonstreRepository $monstreRepository,
+        private readonly RecetteRepository $recetteRepository,
         private readonly EntityManagerInterface $entityManager
     ){}
 
@@ -77,29 +86,29 @@ class QuestEditorService
                     'equipementId' => $action->getEquipement()?->getId() ?? 0,
                     'consommableId' => $action->getConsommable()?->getId() ?? 0,
                     'bossId' => $action->getBoss()?->getId() ?? 0,
+                    'monstreId' => $action->getMonstre()?->getId() ?? 0,
+                    'recetteId' => $action->getRecette()?->getId() ?? 0,
                     'pnjId' => $action->getPnj()?->getId() ?? 0,
                     'carteId' => $action->getCarte()?->getId() ?? 0,
+                    'karma' => $action->getKarma() ?? 0,
                     'effect' => $action->getEffect()?->value ?? '',
                     'effectParams' => $action->getEffectParams() !== null ? json_encode($action->getEffectParams()) : '',
+                    // Branchement : clé de la séquence cible, '__END__' pour terminer, '' pour le linéaire.
+                    'nextSequenceKey' => $this->serializeBranchKey($action),
+                    'recompense' => $this->serializeRecompense($action->getRecompense()),
                 ];
             }
 
-            $recompense = $sequence->getRecompense();
             $sequences[] = [
                 'id' => $sequence->getId(),
+                // La clé stable d'une séquence existante est son id (les nouvelles
+                // séquences reçoivent une clé temporaire générée par le front).
+                'clientKey' => (string)$sequence->getId(),
                 'nomSequence' => $sequence->getName(),
                 'dialogueTitre' => $sequence->getDialogueTitre() ?? '',
                 'dialogueContenu' => $sequence->getDialogueContenu() ?? '',
                 'pnjId' => $sequence->getPnj()?->getId() ?? 0,
                 'actions' => $actions,
-                'recompense' => [
-                    'money' => $recompense?->getMoney() ?? 0,
-                    'experience' => $recompense?->getExperience() ?? 0,
-                    'quantity' => $recompense?->getQuantity() ?? 0,
-                    'objetId' => $recompense?->getObjet()?->getId() ?? 0,
-                    'equipementId' => $recompense?->getEquipement()?->getId() ?? 0,
-                    'consommableId' => $recompense?->getConsommable()?->getId() ?? 0,
-                ],
             ];
         }
 
@@ -129,6 +138,15 @@ class QuestEditorService
             'equipements' => $toIdName($this->equipementRepository->findAll(), 'getNom'),
             'consommables' => $toIdName($this->consommableRepository->findAll(), 'getNom'),
             'bosses' => $toIdName($this->bossRepository->findAll(), 'getName'),
+            'monstres' => $toIdName($this->monstreRepository->findAll(), 'getName'),
+            'recettes' => $toIdName($this->recetteRepository->findAll(), 'getNom'),
+            // Les ressources sont les objets rattachés à un métier (lot 1 de l'artisanat) :
+            // proposer tout le catalogue d'objets ferait écrire des quêtes de cueillette
+            // sur des objets qu'aucune case ne fait jamais récolter.
+            'ressources' => $toIdName(
+                array_values(array_filter($this->objetRepository->findAll(), fn ($objet) => $objet->getMetier() !== null)),
+                'getName'
+            ),
             'pnjs' => $toIdName($this->pnjRepository->findAll(), 'getName'),
             'cartes' => $toIdName($this->carteRepository->findAll(), 'getNom'),
             'quetes' => $this->listQuests(),
@@ -152,6 +170,14 @@ class QuestEditorService
 
             return $quete->getId();
         });
+
+        // Relecture depuis la BASE et non depuis les entités en mémoire (même piège que
+        // dans les autres services d'édition, cf. CLAUDE.md) : les séquences et actions
+        // d'une quête NEUVE ont été persistées sans être ajoutées aux collections
+        // inverses, qui sont donc vides. Sans ce `clear()`, créer une quête renvoyait
+        // `sequences: []` — et le front, qui fait `reset(saved)`, vidait à l'écran le
+        // travail qu'il venait d'enregistrer.
+        $this->entityManager->clear();
 
         return $this->getQuestForEditor($questId);
     }
@@ -236,26 +262,68 @@ class QuestEditorService
         }
         $this->entityManager->flush();
 
+        // Passe 1 : upsert des séquences, actions et récompenses. On mémorise
+        // la correspondance clientKey -> Séquence et le câblage de branchement
+        // à résoudre en passe 2 (les cibles peuvent être des séquences créées
+        // plus loin dans le même payload, sans id au moment où on lit l'action).
         $keptSequenceIds = [];
         $firstSequence = null;
         $usedPnjs = [];
+        $clientKeyToSequence = [];
+        $branchWiring = [];
         foreach (array_values($sequencesData) as $index => $sequenceData) {
-            $sequence = $this->upsertSequence($quete, $sequenceData, $index + 1);
+            $sequence = $this->upsertSequence($quete, $sequenceData, $index + 1, $branchWiring);
             $keptSequenceIds[] = $sequence->getId();
             $firstSequence ??= $sequence;
             $pnj = $sequence->getPnj();
             $usedPnjs[$pnj->getId()] = $pnj;
+            $clientKeyToSequence[(string)($sequenceData['clientKey'] ?? $sequence->getId())] = $sequence;
         }
+
+        // Passe 2 : résolution des branchements (toujours réinitialisés depuis
+        // le payload, cibles limitées aux séquences de cette quête).
+        foreach ($branchWiring as ['action' => $action, 'key' => $key]) {
+            $this->applyBranch($action, $key, $clientKeyToSequence);
+        }
+        $this->entityManager->flush();
 
         foreach ($existingSequences as $id => $sequence) {
             if (!in_array($id, $keptSequenceIds, true)) {
                 $this->repointUserQuetes($sequence, $firstSequence);
+                // Détache les branchements pointant vers cette séquence avant sa
+                // suppression (contrainte FK next_sequence_id).
+                $this->detachBranchesTargeting($sequence);
                 $this->removeSequence($sequence);
             }
         }
 
         $this->syncPnjQuestLinks($quete, $usedPnjs);
 
+        $this->entityManager->flush();
+    }
+
+    /** Applique une clé de branchement d'éditeur à une action. */
+    private function applyBranch(Action $action, string $key, array $clientKeyToSequence): void
+    {
+        if ($key === self::QUEST_END_KEY) {
+            $action->setEndsQuest(true);
+            $action->setNextSequence(null);
+        } else {
+            $action->setEndsQuest(null);
+            // Clé inconnue (cible supprimée) => retour au linéaire par défaut.
+            $action->setNextSequence($clientKeyToSequence[$key] ?? null);
+        }
+
+        $this->entityManager->persist($action);
+    }
+
+    /** Annule les branchements de toutes les actions vers $target (avant suppression). */
+    private function detachBranchesTargeting(Sequence $target): void
+    {
+        foreach ($this->actionRepository->findBy(['nextSequence' => $target]) as $action) {
+            $action->setNextSequence(null);
+            $this->entityManager->persist($action);
+        }
         $this->entityManager->flush();
     }
 
@@ -290,7 +358,7 @@ class QuestEditorService
         }
     }
 
-    private function upsertSequence(Quete $quete, array $data, int $position): Sequence
+    private function upsertSequence(Quete $quete, array $data, int $position, array &$branchWiring): Sequence
     {
         $sequenceId = (int)($data['id'] ?? 0);
         if ($sequenceId > 0) {
@@ -317,13 +385,12 @@ class QuestEditorService
         $this->entityManager->persist($sequence);
         $this->entityManager->flush();
 
-        $this->upsertActions($sequence, $data['actions'] ?? []);
-        $this->upsertRecompense($sequence, $data['recompense'] ?? []);
+        $this->upsertActions($sequence, $data['actions'] ?? [], $branchWiring);
 
         return $sequence;
     }
 
-    private function upsertActions(Sequence $sequence, array $actionsData): void
+    private function upsertActions(Sequence $sequence, array $actionsData, array &$branchWiring): void
     {
         if ($actionsData === []) {
             throw new QuestException(
@@ -355,6 +422,13 @@ class QuestEditorService
 
             $this->entityManager->persist($action);
             $this->entityManager->persist($sequenceAction);
+            $this->entityManager->flush();
+
+            // Récompense par action (= par branche/choix) et câblage de branchement
+            // différé (la cible peut ne pas encore exister à ce stade).
+            $this->upsertRecompense($action, $actionData['recompense'] ?? []);
+            $branchWiring[] = ['action' => $action, 'key' => (string)($actionData['nextSequenceKey'] ?? '')];
+
             $keptActionIds[] = $action->getId();
         }
 
@@ -393,10 +467,17 @@ class QuestEditorService
         $quantity = (int)($data['quantity'] ?? 0);
         $action->setQuantity($quantity > 0 ? $quantity : null);
 
+        // Le karma peut être NÉGATIF : c'est tout l'intérêt du champ. Il n'est donc
+        // pas filtré comme une quantité (`> 0`), seul 0 vaut « ce choix n'engage rien ».
+        $karma = (int)($data['karma'] ?? 0);
+        $action->setKarma($karma !== 0 ? $karma : null);
+
         $action->setObjet($this->findOrNull($this->objetRepository, (int)($data['objetId'] ?? 0)));
         $action->setEquipement($this->findOrNull($this->equipementRepository, (int)($data['equipementId'] ?? 0)));
         $action->setConsommable($this->findOrNull($this->consommableRepository, (int)($data['consommableId'] ?? 0)));
         $action->setBoss($this->findOrNull($this->bossRepository, (int)($data['bossId'] ?? 0)));
+        $action->setMonstre($this->findOrNull($this->monstreRepository, (int)($data['monstreId'] ?? 0)));
+        $action->setRecette($this->findOrNull($this->recetteRepository, (int)($data['recetteId'] ?? 0)));
         $action->setPnj($this->findOrNull($this->pnjRepository, (int)($data['pnjId'] ?? 0)));
         $action->setCarte($this->findOrNull($this->carteRepository, (int)($data['carteId'] ?? 0)));
 
@@ -426,6 +507,11 @@ class QuestEditorService
             ActionType::PARLER_PNJ => $action->getPnj() === null,
             ActionType::VISITER_CARTE => $action->getCarte() === null,
             ActionType::DONNER_OR, ActionType::ATTEINDRE_LEVEL => $action->getQuantity() === null,
+            // Les types comptables exigent la cible ET la quantité : sans quantité, la
+            // condition serait « au moins un » sans que l'auteur l'ait demandé.
+            ActionType::BATTRE_MONSTRE => $action->getMonstre() === null || $action->getQuantity() === null,
+            ActionType::FABRIQUER_OBJET => $action->getRecette() === null || $action->getQuantity() === null,
+            ActionType::RECOLTER_RESSOURCE => $action->getObjet() === null || $action->getQuantity() === null,
             default => false,
         };
 
@@ -451,7 +537,7 @@ class QuestEditorService
         return $decoded;
     }
 
-    private function upsertRecompense(Sequence $sequence, array $data): void
+    private function upsertRecompense(Action $action, array $data): void
     {
         $money = (int)($data['money'] ?? 0);
         $experience = (int)($data['experience'] ?? 0);
@@ -461,11 +547,11 @@ class QuestEditorService
         $consommable = $this->findOrNull($this->consommableRepository, (int)($data['consommableId'] ?? 0));
 
         $isEmpty = $money <= 0 && $experience <= 0 && $objet === null && $equipement === null && $consommable === null;
-        $recompense = $sequence->getRecompense();
+        $recompense = $action->getRecompense();
 
         if ($isEmpty) {
             if ($recompense !== null) {
-                $sequence->setRecompense(null);
+                $action->setRecompense(null);
                 $this->entityManager->remove($recompense);
             }
 
@@ -474,8 +560,8 @@ class QuestEditorService
 
         if ($recompense === null) {
             $recompense = new Recompense();
-            $recompense->setSequence($sequence);
-            $sequence->setRecompense($recompense);
+            $recompense->setAction($action);
+            $action->setRecompense($recompense);
         }
 
         $recompense->setMoney($money > 0 ? $money : null);
@@ -506,9 +592,6 @@ class QuestEditorService
         foreach ($sequence->getSequenceActions() as $sequenceAction) {
             $this->removeSequenceAction($sequenceAction);
         }
-        if ($sequence->getRecompense() !== null) {
-            $this->entityManager->remove($sequence->getRecompense());
-        }
         $this->entityManager->remove($sequence);
     }
 
@@ -518,6 +601,11 @@ class QuestEditorService
         $action = $sequenceAction->getAction();
         $this->entityManager->remove($sequenceAction);
         if ($action->getCarteCarreaus()->isEmpty()) {
+            // La récompense (OneToOne côté action) part avec l'action.
+            if ($action->getRecompense() !== null) {
+                $this->entityManager->remove($action->getRecompense());
+            }
+            $action->setNextSequence(null);
             $this->entityManager->remove($action);
         }
     }
@@ -525,6 +613,30 @@ class QuestEditorService
     private function findOrNull(object $repository, int $id): ?object
     {
         return $id > 0 ? $repository->find($id) : null;
+    }
+
+    /** Clé de branchement d'une action pour l'éditeur : '__END__' | id cible | ''. */
+    private function serializeBranchKey(Action $action): string
+    {
+        if ($action->getEndsQuest() === true) {
+            return self::QUEST_END_KEY;
+        }
+
+        $target = $action->getNextSequence();
+
+        return $target !== null ? (string)$target->getId() : '';
+    }
+
+    private function serializeRecompense(?Recompense $recompense): array
+    {
+        return [
+            'money' => $recompense?->getMoney() ?? 0,
+            'experience' => $recompense?->getExperience() ?? 0,
+            'quantity' => $recompense?->getQuantity() ?? 0,
+            'objetId' => $recompense?->getObjet()?->getId() ?? 0,
+            'equipementId' => $recompense?->getEquipement()?->getId() ?? 0,
+            'consommableId' => $recompense?->getConsommable()?->getId() ?? 0,
+        ];
     }
 
     /** @return Sequence[] triées par position */

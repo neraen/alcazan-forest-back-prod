@@ -8,8 +8,8 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * Récompense d'une séquence de quête (une seule par séquence),
- * ou récompense de boss via BossRecompense (sequence null).
+ * Récompense d'une action de quête (une seule par action = par branche/choix),
+ * ou récompense de boss via BossRecompense (action null).
  */
 #[ORM\Entity(repositoryClass: RecompenseRepository::class)]
 class Recompense
@@ -19,8 +19,8 @@ class Recompense
     #[ORM\Column(type: 'integer')]
     private $id;
 
-    #[ORM\OneToOne(targetEntity: Sequence::class, inversedBy: 'recompense')]
-    private $sequence;
+    #[ORM\OneToOne(targetEntity: Action::class, inversedBy: 'recompense')]
+    private $action;
 
     #[ORM\Column(type: 'integer', nullable: true)]
     private $money;
@@ -53,14 +53,14 @@ class Recompense
         return $this->id;
     }
 
-    public function getSequence(): ?Sequence
+    public function getAction(): ?Action
     {
-        return $this->sequence;
+        return $this->action;
     }
 
-    public function setSequence(?Sequence $sequence): self
+    public function setAction(?Action $action): self
     {
-        $this->sequence = $sequence;
+        $this->action = $action;
 
         return $this;
     }

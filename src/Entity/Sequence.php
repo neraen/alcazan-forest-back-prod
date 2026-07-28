@@ -35,9 +35,6 @@ class Sequence
     #[ORM\ManyToOne(targetEntity: Quete::class, inversedBy: 'sequences')]
     private $quete;
 
-    #[ORM\OneToOne(mappedBy: 'sequence', targetEntity: Recompense::class)]
-    private $recompense;
-
     #[ORM\OneToMany(mappedBy: 'sequence', targetEntity: UserQuete::class)]
     private $userQuetes;
 
@@ -123,18 +120,6 @@ class Sequence
     public function setQuete(?Quete $quete): self
     {
         $this->quete = $quete;
-
-        return $this;
-    }
-
-    public function getRecompense(): ?Recompense
-    {
-        return $this->recompense;
-    }
-
-    public function setRecompense(?Recompense $recompense): self
-    {
-        $this->recompense = $recompense;
 
         return $this;
     }

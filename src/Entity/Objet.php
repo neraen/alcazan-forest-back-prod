@@ -46,6 +46,23 @@ class Objet
     #[ORM\OneToMany(mappedBy: 'objet', targetEntity: Action::class)]
     private $actions;
 
+    /**
+     * Métier dont cet objet est une RESSOURCE (minerai, plante, peau, bûche). Nul pour
+     * tout le reste : quêtes, babioles, clés.
+     *
+     * Deux colonnes plutôt qu'une entité `Ressource` parallèle : une ressource se
+     * ramasse, s'échange, se vend et se met en sac exactement comme un objet. Un type à
+     * part aurait obligé à réoutiller l'inventaire, l'échange, la boutique, le butin et
+     * les récompenses pour rien.
+     */
+    #[ORM\ManyToOne(targetEntity: Metier::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?Metier $metier = null;
+
+    /** Niveau de métier requis pour la récolter / l'employer. 0 = sans exigence. */
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $niveauRessource = 0;
+
     public function __construct()
     {
         $this->objets = new ArrayCollection();
@@ -287,5 +304,35 @@ class Objet
         }
 
         return $this;
+    }
+
+    public function getMetier(): ?Metier
+    {
+        return $this->metier;
+    }
+
+    public function setMetier(?Metier $metier): self
+    {
+        $this->metier = $metier;
+
+        return $this;
+    }
+
+    public function getNiveauRessource(): int
+    {
+        return $this->niveauRessource;
+    }
+
+    public function setNiveauRessource(int $niveauRessource): self
+    {
+        $this->niveauRessource = max(0, $niveauRessource);
+
+        return $this;
+    }
+
+    /** Une ressource est un objet rattaché à un métier — rien d'autre ne la distingue. */
+    public function estRessource(): bool
+    {
+        return $this->metier !== null;
     }
 }

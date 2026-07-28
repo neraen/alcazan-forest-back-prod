@@ -43,6 +43,15 @@ security:
         # Outils d'administration (MapMaker, QuestMaker, etc.) : réservés aux admins
         # Le QuestMaker entier (lectures comprises) vit sous /api/quest/editor.
         - { path: ^/api/quest/editor, roles: ROLE_ADMIN }
-        - { path: ^/api/(map|pnj|monstre|equipement)/(create|update), roles: ROLE_ADMIN }
+        # Idem pour le DonjonMaker : /api/donjon/editor est admin, /api/donjon/* reste joueur.
+        - { path: ^/api/donjon/editor, roles: ROLE_ADMIN }
+        - { path: ^/api/shop/editor, roles: ROLE_ADMIN }
+        # L'InteractionMaker est admin ; /api/interaction/executer reste une route joueur.
+        - { path: ^/api/interaction/editor, roles: ROLE_ADMIN }
+        # L'ArtisanatMaker est admin ; /api/craft/* et /api/metier/* restent joueur.
+        - { path: ^/api/artisanat/editor, roles: ROLE_ADMIN }
+        # Upload d'images depuis l'admin (métiers, objets, PNJ, monstres, interactions).
+        - { path: ^/api/admin/, roles: ROLE_ADMIN }
+        - { path: ^/api/(map|pnj|monstre|equipement)/(create|update|upload-icone|import-csv), roles: ROLE_ADMIN }
         - { path: ^/insert, roles: ROLE_ADMIN }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

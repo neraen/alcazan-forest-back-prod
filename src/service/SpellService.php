@@ -39,6 +39,8 @@ class SpellService
         private UserBossRepository $userBossRepository,
         private UserBuffRepository $userBuffRepository,
         private BuffCaracteristiqueRepository $buffCaracteristiqueRepository,
+        private DonjonInstanceService $donjonInstanceService,
+        private DonjonCombatService $donjonCombatService,
         private EntityManagerInterface $entityManager
     ){
     }
@@ -81,9 +83,23 @@ class SpellService
         $armureJoueur = 0;
         $damageStat['damage'] = $this->getSpellDamageByCarac($spell, $caracteristiques['principale'], $caracteristiques['secondaire']) - ($armureJoueur * 0.2);
 
-        $life = $target->getActualLife() - $damageStat['damage'];
+        // En donjon, la vie du boss appartient à l'INSTANCE : `boss.actual_life` reste la
+        // valeur des boss de plein air, partagée par tout le serveur.
+        $instance = $this->donjonInstanceService->instancePourBoss($user, $target);
 
-        if($life <= 0){
+        // Garde-fous SERVEUR (PA, carte, portée) : sans eux, la position n'a aucun poids
+        // et les mécaniques de déplacement du donjon ne veulent rien dire.
+        $this->donjonCombatService->verifierAttaqueBoss($user, $target, $spell);
+
+        $vieAvant = $instance !== null
+            ? $this->donjonInstanceService->vieBoss($instance, $target)
+            : $target->getActualLife();
+
+        $life = $vieAvant - $damageStat['damage'];
+
+        $kill = $life <= 0;
+        if($kill){
+            $life = 0;
             $killMessage = "Vous avez terrassé  {$target->getName()}.";
             $userBossEntity = $this->userBossRepository->findOneBy(['boss' => $target->getId(), 'user' => $user->getId()]);
             if(!is_null($userBossEntity)){
@@ -101,25 +117,90 @@ class SpellService
                 $this->entityManager->flush();
             }
 
-            /** todo: coder drop equipement boss */
-
+            if($instance !== null){
+                // L'instance passe TERMINEE : le groupe garde l'accès à la salle au
+                // trésor mais ne peut plus recombattre le boss avec le même verrou.
+                $this->donjonInstanceService->enregistrerVieBoss($instance, 0);
+            }else{
+                // `boss.actual_life` est une colonne GLOBALE (partagée par tout le serveur) :
+                // sans remise à zéro, un boss de plein air reste mort pour tout le monde.
+                $this->bossRepository->updateBossLife($target->getId(), $target->getMaxLife());
+            }
         }else{
-            $this->bossRepository->updateBossLife($target->getId(), $life);
+            if($instance !== null){
+                $this->donjonInstanceService->enregistrerVieBoss($instance, $life);
+            }else{
+                $this->bossRepository->updateBossLife($target->getId(), $life);
+            }
         }
 
-        $bossLifePercent = floor($target->getActualLife() / $target->getMaxLife() * 100);
+        $pointActionRestant = $user->getActionPoint() - $spell->getPointAction();
+        $user->setActionPoint($pointActionRestant);
+
+        // Un boss terrassé ne riposte pas.
+        if($kill){
+            $this->entityManager->persist($user);
+            $this->entityManager->flush();
+
+            return ['life' => 0, 'lifeJoueur' => $user->getCurrentLife(), 'damage' => $damageStat['damage'],
+                    'damageReturns' => 0, 'killMessage' => $killMessage, 'spell' => null, 'kill' => true,
+                    'combat' => ['messages' => [], 'zones' => []]];
+        }
+
+        // Phase du boss : calculée sur la vie RESTANTE (et non sur la valeur d'avant le coup).
+        $bossLifePercent = floor($life / $target->getMaxLife() * 100);
         $bossSpell = $this->bossSortilegeRepository->getBossSpellByLifePercent($target->getId(), $bossLifePercent);
         $armureJoueur = $this->caracteristiqueService->getPlayerArmor($user);
         $damageReturns =  $bossSpell['degatBase'] + floor(mt_rand($target->getPuissance() * $bossSpell['coefSecondaire'],$target->getPuissance() * $bossSpell['coefPrincipal'])) - ($armureJoueur * 0.2);
 
+        $combat = ['messages' => [], 'zones' => []];
+        if($instance !== null){
+            // Menace d'abord : la riposte doit viser la cible D'APRÈS ce coup-ci.
+            $this->donjonCombatService->engagerCombat($instance);
+            $this->donjonCombatService->ajouterMenaceDegats($instance, $user, (int)$damageStat['damage']);
+            $this->entityManager->flush();
+
+            $damageReturns = (int)round($damageReturns * $this->donjonCombatService->multiplicateurEnrage($instance));
+
+            // Le boss frappe la plus grosse menace, pas forcément l'attaquant : c'est ce
+            // qui fait exister le rôle de tank. Restreint à SA salle (on lui passe le boss) :
+            // il continuait sinon de frapper un joueur reparti dans une autre salle.
+            $cible = $this->donjonCombatService->cibleDuBoss($instance, $target);
+            $victime = $cible?->getUser() ?? $user;
+            $victime->setCurrentLife($victime->getCurrentLife() - $damageReturns);
+            $this->entityManager->persist($victime);
+            $this->entityManager->flush();
+
+            // Le coup du boss peut TUER, y compris un autre joueur que l'attaquant : sans
+            // ça la victime restait en vie négative sur place, toujours ciblée.
+            // `diePlayer` écrit en DQL — donc après le flush ci-dessus, jamais avant.
+            $victimeMorte = $victime->getCurrentLife() <= 0;
+            $apresMort = $victimeMorte ? $this->deathService->diePlayer($victime) : null;
+
+            $combat = $this->donjonCombatService->jouerTick($instance, $target);
+            $combat['cible'] = $victime->getPseudo();
+
+            return ['life' => $life, 'lifeJoueur' => $user->getCurrentLife(), 'damage' => $damageStat['damage'],
+                    'damageReturns' => $victime->getId() === $user->getId() ? $damageReturns : 0,
+                    'killMessage' => null, 'spell' => $bossSpell['name'], 'kill' => false, 'combat' => $combat,
+                    // La mort est jouée ICI (c'est ici que le coup porte) : le contrôleur
+                    // n'a plus qu'à en tirer le message et la carte d'arrivée.
+                    'mortJoueur' => $victimeMorte && $victime->getId() === $user->getId(),
+                    'apresMort' => $apresMort];
+        }
+
         $lifeJoueurAfterReturns = $user->getCurrentLife() - $damageReturns;
         $user->setCurrentLife($lifeJoueurAfterReturns);
-        $pointActionRestant = $user->getActionPoint() - $spell->getPointAction();
-        $user->setActionPoint($pointActionRestant);
         $this->entityManager->persist($user);
         $this->entityManager->flush();
 
-        return ['life' => $life, 'lifeJoueur' => $lifeJoueurAfterReturns,'damage' => $damageStat['damage'], 'damageReturns' => $damageReturns, 'killMessage' => $killMessage ?? null, 'spell' => $bossSpell['name']];
+        $mortJoueur = $lifeJoueurAfterReturns <= 0;
+        $apresMort = $mortJoueur ? $this->deathService->diePlayer($user) : null;
+
+        return ['life' => $life, 'lifeJoueur' => $user->getCurrentLife(), 'damage' => $damageStat['damage'],
+                'damageReturns' => $damageReturns, 'killMessage' => null, 'spell' => $bossSpell['name'],
+                'kill' => false, 'combat' => $combat,
+                'mortJoueur' => $mortJoueur, 'apresMort' => $apresMort];
     }
 
     public function computeHonnorGain(User $user, int $targetLevel, int $playerLevel){
@@ -233,6 +314,13 @@ class SpellService
         $isPlayerBuffed = $this->userBuffRepository->findOneBy(['buff' => $buff->getId(), 'user' => $user->getId()]);
         $allBuffsInPlayer = $this->userBuffRepository->findBy(['user' => $user]);
         return $isPlayerBuffed === null && count($allBuffsInPlayer) < 3;
+    }
+
+    /** Dégâts bruts d'un sort lancé par ce joueur (avant armure de la cible). */
+    public function getSpellDamageForUser(User $user, Sortilege $spell): int{
+        $caracteristiques = $this->getCaracsForSpell($user, $spell);
+
+        return $this->getSpellDamageByCarac($spell, $caracteristiques['principale'], $caracteristiques['secondaire']);
     }
 
     public function getCaracsForSpell(User $user, Sortilege $spell): array{

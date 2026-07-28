@@ -19,17 +19,44 @@ class EquipementRepository extends ServiceEntityRepository
         parent::__construct($registry, Equipement::class);
     }
 
+    /**
+     * ⚠️ Ne PAS joindre `equipement.classe` ici : la relation est N-N, un équipement à deux
+     * classes reviendrait en double dans ce résultat scalaire. Les classes se récupèrent à
+     * part, via getClassesByEquipement().
+     */
     public function getAllEquipementGroupedByPosition(){
         return $this->createQueryBuilder('equipement')
             ->select('equipement.nom, equipement.id, equipement.icone, equipement.prixRevente, equipement.description,
-                equipement.prixAchat, equipement.level_min levelMin, positionEquipement.id positionEquipementId, 
-                positionEquipement.name positionEquipementName, classe.id classeId, classe.nom classeName,
+                equipement.prixAchat, equipement.level_min levelMin, positionEquipement.id positionEquipementId,
+                positionEquipement.name positionEquipementName,
                 rarity.id rarityId, rarity.name rarityName')
             ->leftJoin('equipement.positionEquipement', 'positionEquipement')
-            ->leftJoin('equipement.classe', 'classe')
             ->leftJoin('equipement.rarity', 'rarity')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Classes autorisées, indexées par id d'équipement. Un équipement sans aucune classe
+     * (absent du tableau) est utilisable par TOUTES les classes — c'est la convention retenue,
+     * elle reste juste quand une nouvelle classe est ajoutée au jeu.
+     *
+     * @return array<int, array<int, array{id: int, nom: string}>>
+     */
+    public function getClassesByEquipement(): array
+    {
+        $lignes = $this->createQueryBuilder('equipement')
+            ->select('equipement.id as equipementId, classe.id, classe.nom')
+            ->join('equipement.classe', 'classe')
+            ->getQuery()
+            ->getResult();
+
+        $parEquipement = [];
+        foreach ($lignes as $ligne) {
+            $parEquipement[$ligne['equipementId']][] = ['id' => $ligne['id'], 'nom' => $ligne['nom']];
+        }
+
+        return $parEquipement;
     }
 
     // /**

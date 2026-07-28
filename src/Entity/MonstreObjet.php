@@ -30,6 +30,23 @@ class MonstreObjet
     #[ORM\Column(type: 'integer')]
     private $diviseurTauxDrop;
 
+    /**
+     * Métier requis pour PRÉLEVER cette ligne de butin — le dépeceur et ses peaux.
+     *
+     * Nul pour tout le reste : le butin ordinaire tombe pour n'importe qui, et c'est le
+     * comportement de toutes les lignes existantes.
+     */
+    #[ORM\ManyToOne(targetEntity: Metier::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?Metier $metier = null;
+
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $niveauMetierMin = 0;
+
+    /** Expérience de métier créditée quand la ligne tombe. */
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $experienceMetier = 0;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -93,5 +110,47 @@ class MonstreObjet
         $this->diviseurTauxDrop = $diviseurTauxDrop;
 
         return $this;
+    }
+
+    public function getMetier(): ?Metier
+    {
+        return $this->metier;
+    }
+
+    public function setMetier(?Metier $metier): self
+    {
+        $this->metier = $metier;
+
+        return $this;
+    }
+
+    public function getNiveauMetierMin(): int
+    {
+        return $this->niveauMetierMin;
+    }
+
+    public function setNiveauMetierMin(int $niveauMetierMin): self
+    {
+        $this->niveauMetierMin = max(0, $niveauMetierMin);
+
+        return $this;
+    }
+
+    public function getExperienceMetier(): int
+    {
+        return $this->experienceMetier;
+    }
+
+    public function setExperienceMetier(int $experienceMetier): self
+    {
+        $this->experienceMetier = max(0, $experienceMetier);
+
+        return $this;
+    }
+
+    /** Cette ligne de butin exige-t-elle un métier pour être prélevée ? */
+    public function exigeUnMetier(): bool
+    {
+        return $this->metier !== null;
     }
 }

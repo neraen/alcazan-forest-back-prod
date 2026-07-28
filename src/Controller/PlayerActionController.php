@@ -3,26 +3,26 @@
 namespace App\Controller;
 
 use App\Entity\Friend;
-use App\Entity\InventaireEquipement;
 use App\Entity\JoueurGuilde;
+use App\Enum\TypeItem;
 use App\Repository\BossRepository;
 use App\Repository\ConsommableRepository;
 use App\Repository\EquipementRepository;
 use App\Repository\FriendRepository;
 use App\Repository\GuildeRepository;
-use App\Repository\InventaireConsommableRepository;
-use App\Repository\InventaireEquipementRepository;
-use App\Repository\InventaireRepository;
 use App\Repository\MonstreCarreauRepository;
 use App\Repository\SortilegeRepository;
 use App\Repository\UserRepository;
 use App\service\DeathService;
 use App\service\HistoriqueService;
+use App\service\SacService;
 use App\service\LevelingService;
 use App\service\SpellService;
+use App\service\VenteService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
+use App\Exception\DonjonException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -144,6 +144,9 @@ class PlayerActionController extends AbstractController
             $newExperience['experience'] = $statsAfterDeath['experience'];
             $mapId = $statsAfterDeath['mapId'];
             $isDead = true;
+            // Après la mort, la vie est celle du ressuscité : renvoyer la valeur négative
+            // du coup fatal afficherait « -35/765 » dans la fiche.
+            $arrayStat['lifeJoueur'] = $user->getCurrentLife();
         }
 
         $message =  "Vous infligez {$arrayStat['damage']} points de dommages et vous gagnez $experience points d'expériences <br />
@@ -188,7 +191,12 @@ class PlayerActionController extends AbstractController
 
         $experience = 0;
         if($spell->getType() === "attack"){
-            $arrayStat = $spellService->doDamageOnBoss($target, $spell, $user);
+            try{
+                $arrayStat = $spellService->doDamageOnBoss($target, $spell, $user);
+            }catch(DonjonException $exception){
+                // Garde-fous serveur (PA, carte, portée) : message FR destiné au joueur.
+                return new JsonResponse(['error' => $exception->getMessage()], Response::HTTP_BAD_REQUEST);
+            }
             $experience =  mt_rand(235, 340);
         }else{
             /** coder les buffs */
@@ -199,18 +207,23 @@ class PlayerActionController extends AbstractController
 
         $newExperience = $levelingService->giveExperienceToAPlayer($experience, $user->getId());
 
-        $isDead = false;
-        if((int)$arrayStat['lifeJoueur'] <= 0){
-            $statsAfterDeath = $deathService->diePlayer($user);
+        // La mort est jouée par SpellService, là où le coup du boss porte (il peut d'ailleurs
+        // frapper un AUTRE joueur que l'attaquant). Le contrôleur ne fait plus que le
+        // constater : tester `lifeJoueur <= 0` ici ne marcherait plus, la vie étant déjà
+        // remise à son maximum par la mort.
+        $isDead = (bool)($arrayStat['mortJoueur'] ?? false);
+        if($isDead){
             $message = "Le boss {$target->getName()} vous a infligé {$arrayStat['damage']} et vous a tué.";
             $historiqueService->recordInHistoryPlayer($user, $message, true);
-            $newExperience['experience'] = $statsAfterDeath['experience'];
-            $mapId = $statsAfterDeath['mapId'];
-            $isDead = true;
+            $newExperience['experience'] = $arrayStat['apresMort']['experience'] ?? $newExperience['experience'];
+            $mapId = $arrayStat['apresMort']['mapId'] ?? null;
         }
 
-        $message = "Vous infligez {$arrayStat['damage']} points de dommages et vous gagnez $experience points d'expériences <br />
-                     {$target->getName()} vous attaque avec {$arrayStat['spell']} et vous inflige {$arrayStat['damageReturns']} points de dommage !<br />";
+        $message = "Vous infligez {$arrayStat['damage']} points de dommages et vous gagnez $experience points d'expériences <br />";
+
+        if(!($arrayStat['kill'] ?? false)){
+            $message .= "{$target->getName()} vous attaque avec {$arrayStat['spell']} et vous inflige {$arrayStat['damageReturns']} points de dommage !<br />";
+        }
 
         $message .= !is_null($arrayStat['killMessage']) ? $arrayStat['killMessage']. " <br />" : "";
         $message .= $isDead ? "<strong> Vous êtes mort suite aux blessures infligées par {$target->getName()}. </strong>" : "";
@@ -228,7 +241,11 @@ class PlayerActionController extends AbstractController
             'level' => $newExperience['level'],
             'message' => $message,
             'pa' => $user->getActionPoint(),
-            'needRefresh' => isset($arrayStat['kill'])
+            'bossLife' => $arrayStat['life'] ?? null,
+            // Retour des mécaniques de donjon (zones annoncées, renforts, cible du boss) :
+            // le front les affiche sans avoir à rappeler /api/donjon/combat.
+            'combat' => $arrayStat['combat'] ?? null,
+            'needRefresh' => ($arrayStat['kill'] ?? false) || $isDead
         ]);
 
         return new Response($json);
@@ -268,58 +285,44 @@ class PlayerActionController extends AbstractController
 
     #[Route("/joueur/use/consommable", name:"joueur_use_consommable", methods: ["POST"])]
     public function useConsommable(
-        Request                         $request,
-        InventaireRepository            $inventaireRepository,
-        InventaireConsommableRepository $inventaireConsommableRepository,
-        ConsommableRepository           $consommableRepository,
-        EntityManagerInterface          $entityManager,
+        Request                $request,
+        ConsommableRepository  $consommableRepository,
+        SacService             $sacService,
+        EntityManagerInterface $entityManager,
     ): Response {
         $dataConsommable = json_decode($request->getContent(), true);
-        $consommableEntity = $consommableRepository->find($dataConsommable['consommableId']);
+        $consommableEntity = $consommableRepository->find($dataConsommable['consommableId'] ?? 0);
         $user = $this->getUser();
 
-        $inventaireEntity = $inventaireRepository->findOneBy(['user' => $user->getId()]);
-        $inventaireConsommable = $inventaireConsommableRepository->findOneBy(
-            ['inventaire' => $inventaireEntity->getId(), 'consommable' =>$dataConsommable['consommableId']]);
-
         $message = '';
-        $quantity = $inventaireConsommable->getQuantity();
-        if($quantity > 0){
+        if ($consommableEntity === null) {
+            $message = "Ce consommable n'existe pas.";
+        } else {
+            try {
+                $entityManager->wrapInTransaction(function () use ($sacService, $user, $consommableEntity, $entityManager): void {
+                    // Contrôle possession ET disponible : un consommable réservé par un
+                    // échange en cours n'est pas utilisable.
+                    $sacService->retirerItem($user, TypeItem::CONSOMMABLE, $consommableEntity->getId(), 1);
 
-            $inventaireConsommable->setQuantity($quantity-1);
-            $entityManager->persist($user);
-            $entityManager->flush();
-
-            $typeConsommable = $consommableEntity->getType();
-            if(!$consommableEntity->getIsBuff()){
-                if($typeConsommable === "vie"){
-                    $userLifeAfterUse = $user->getCurrentLife() + $consommableEntity->getPoints();
-                    if($userLifeAfterUse > $user->getMaxLife()){
-                        $userLifeAfterUse = $user->getMaxLife();
+                    if (!$consommableEntity->getIsBuff()) {
+                        if ($consommableEntity->getType() === "vie") {
+                            $user->setCurrentlife(min(
+                                $user->getMaxLife(),
+                                $user->getCurrentLife() + $consommableEntity->getPoints()
+                            ));
+                        } elseif ($consommableEntity->getType() === "mana") {
+                            $user->setCurrentMana(min(
+                                $user->getMaxMana(),
+                                $user->getCurrentMana() + $consommableEntity->getPoints()
+                            ));
+                        }
+                        $entityManager->persist($user);
                     }
-
-                    $user->setCurrentlife($userLifeAfterUse);
-                    $entityManager->persist($user);
-
-                }elseif ($typeConsommable === "mana"){
-                    $userManaAfterUse = $user->getCurrentMana() + $consommableEntity->getPoints();
-                    if($userManaAfterUse > $user->getMaxMana()){
-                        $userManaAfterUse = $user->getMaxMana();
-                    }
-
-                    $user->setCurrentMana($userManaAfterUse);
-                    $entityManager->persist($user);
-                }
-                $entityManager->flush();
-            }else{
-
+                });
+            } catch (\DomainException $exception) {
+                $message = $exception->getMessage();
             }
-
-        }else{
-            $message = "Vous n'avez plus de cette potion. Action impossible";
         }
-
-
 
         return new JsonResponse([
             'life' =>  $user->getCurrentLife(),
@@ -334,42 +337,108 @@ class PlayerActionController extends AbstractController
     public function playerBuyItem(
         Request                         $request,
         EquipementRepository            $equipementRepository,
-        InventaireRepository            $inventaireRepository,
-        InventaireEquipementRepository  $inventaireEquipementRepository,
+        \App\Repository\PnjRepository            $pnjRepository,
+        \App\Repository\ShopEquipementRepository $shopEquipementRepository,
+        SacService                      $sacService,
         EntityManagerInterface          $entityManager,
     ): Response {
         $data = json_decode($request->getContent(), true);
-        $idEquipement = $data['item'];
-        $equipementEntity = $equipementRepository->find($idEquipement);
+        $idEquipement = $data['item'] ?? null;
+        $equipementEntity = $idEquipement !== null ? $equipementRepository->find($idEquipement) : null;
         $user = $this->getUser();
-        $moneyAfterBuy = $user->getMoney() - $equipementEntity->getPrixAchat();
 
-        if($moneyAfterBuy < 0){
+        if ($equipementEntity === null) {
             return new JsonResponse([
                 'money' => $user->getMoney(),
-                'message' => "Vous n'avez pas assez d'or pour acheter cet objet."
-            ]);
+                'error' => "Cet objet n'est plus en vente."
+            ], Response::HTTP_BAD_REQUEST);
         }
 
-        $inventaireEntity = $inventaireRepository->findOneBy(['user' => $user->getId()]);
-        $shouldIncrementExistingEquipement = $inventaireEquipementRepository->findOneBy(['inventaire' => $inventaireEntity->getId(), 'equipement' => $idEquipement]);
-
-        if($shouldIncrementExistingEquipement){
-            $shouldIncrementExistingEquipement->setQuantity($shouldIncrementExistingEquipement->getQuantity() + 1);
-            $entityManager->persist($shouldIncrementExistingEquipement);
-        }else{
-            $inventaireEquipementEntity = new InventaireEquipement();
-            $inventaireEquipementEntity->setQuantity(1);
-            $inventaireEquipementEntity->setEquipement($equipementEntity);
-            $inventaireEquipementEntity->setInventaire($inventaireEntity);
-            $entityManager->persist($inventaireEquipementEntity);
+        // Prix effectif : prix fixé en boutique (shop_equipement.prix) si dispo,
+        // sinon prix d'achat de base de l'équipement.
+        $price = $equipementEntity->getPrixAchat();
+        $pnjId = $data['pnjId'] ?? null;
+        if ($pnjId !== null) {
+            $shop = $pnjRepository->find($pnjId)?->getShop();
+            if ($shop !== null) {
+                $line = $shopEquipementRepository->findOneBy(['shop' => $shop, 'equipement' => $equipementEntity]);
+                if ($line !== null && $line->getPrix() !== null) {
+                    $price = $line->getPrix();
+                }
+            }
+        }
+        try {
+            // Débit + ajout au sac dans UNE transaction ; le débit contrôle l'or DISPONIBLE
+            // (solde moins l'or réservé par un échange en cours).
+            $entityManager->wrapInTransaction(function () use ($sacService, $user, $equipementEntity, $price): void {
+                $sacService->debiterOr($user, $price);
+                $sacService->ajouterItem($user, TypeItem::EQUIPEMENT, $equipementEntity->getId(), 1);
+            });
+        } catch (\DomainException $exception) {
+            return new JsonResponse([
+                'money' => $user->getMoney(),
+                'error' => "Vous n'avez pas assez d'or pour acheter cet objet."
+            ], Response::HTTP_BAD_REQUEST);
         }
 
-        $user->setMoney($moneyAfterBuy);
-        $entityManager->persist($user);
-        $entityManager->flush();
+        return new JsonResponse([
+            'money' => $user->getMoney(),
+            'prix' => $price,
+            'nomEquipement' => $equipementEntity->getNom(),
+            'message' => sprintf('%s acheté pour %d pièces d\'or.', $equipementEntity->getNom(), $price)
+        ]);
+    }
 
-        return new JsonResponse(['money' => $moneyAfterBuy]);
+
+    /**
+     * Vente d'un item du sac au marchand. Le prix encaissé est celui de l'item (0 si le
+     * contenu n'en définit pas) : le client n'envoie jamais de montant.
+     */
+    #[Route("/joueur/sell/shop", name:"joueur_sell_shop", methods: ["POST"])]
+    public function playerSellItem(
+        Request      $request,
+        VenteService $venteService
+    ): Response {
+        $data = json_decode($request->getContent(), true);
+        $user = $this->getUser();
+
+        $type = TypeItem::tryFrom((string) ($data['type'] ?? ''));
+        if ($type === null) {
+            return new JsonResponse([
+                'money' => $user->getMoney(),
+                'error' => "Type d'objet inconnu."
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        try {
+            $vente = $venteService->sell(
+                $user,
+                $type,
+                (int) ($data['id'] ?? 0),
+                (int) ($data['quantite'] ?? 1)
+            );
+        } catch (\DomainException $exception) {
+            return new JsonResponse([
+                'money' => $user->getMoney(),
+                'error' => $exception->getMessage()
+            ], Response::HTTP_BAD_REQUEST);
+        }
+
+        $pluriel = $vente['quantite'] > 1;
+        $intitule = $pluriel
+            ? sprintf('%d × %s', $vente['quantite'], $vente['nom'])
+            : $vente['nom'];
+
+        return new JsonResponse([
+            'money' => $vente['money'],
+            'prix' => $vente['prix'],
+            'prixUnitaire' => $vente['prixUnitaire'],
+            'quantite' => $vente['quantite'],
+            'nom' => $vente['nom'],
+            'message' => $vente['prix'] > 0
+                ? sprintf('%s %s pour %d pièces d\'or.', $intitule, $pluriel ? 'vendus' : 'vendu', $vente['prix'])
+                : sprintf('%s %s — le marchand n\'en donne rien.', $intitule, $pluriel ? 'cédés' : 'cédé')
+        ]);
     }
 
 

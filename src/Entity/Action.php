@@ -61,12 +61,44 @@ class Action
     #[ORM\ManyToOne(targetEntity: Carte::class, inversedBy: 'actions')]
     private $carte;
 
+    /** Recette à fabriquer (FABRIQUER_OBJET). */
+    #[ORM\ManyToOne(targetEntity: Recette::class)]
+    private ?Recette $recette = null;
+
     #[ORM\Column(type: 'integer', nullable: true)]
     private $quantity;
+
+    /**
+     * Karma gagné (positif) ou perdu (négatif) quand ce bouton est joué.
+     *
+     * Porté par l'ACTION et non par la séquence : c'est le choix du joueur qui a un
+     * poids moral, pas le fait d'avoir lu un dialogue. Deux boutons d'une même
+     * séquence — « je tiens parole » / « je garde l'or » — sont exactement le
+     * dispositif que cette colonne sert à rendre possible.
+     *
+     * null ou 0 = ce choix n'engage rien. L'ajustement passe TOUJOURS par KarmaService,
+     * qui borne la valeur : le contenu ne peut pas fabriquer un saint définitif.
+     */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $karma = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private $message;
 
+    /**
+     * Branchement : séquence vers laquelle sauter après ce choix (au lieu du
+     * position + 1 linéaire). null = comportement linéaire par défaut.
+     */
+    #[ORM\ManyToOne(targetEntity: Sequence::class)]
+    private $nextSequence;
+
+    /** Ce choix termine la quête (prioritaire sur nextSequence). */
+    #[ORM\Column(type: 'boolean', nullable: true)]
+    private $endsQuest;
+
+    /** Récompense donnée quand ce choix est joué (une par action = par branche). */
+    #[ORM\OneToOne(mappedBy: 'action', targetEntity: Recompense::class)]
+    private $recompense;
 
 
     public function __construct()
@@ -272,6 +304,18 @@ class Action
         return $this;
     }
 
+    public function getRecette(): ?Recette
+    {
+        return $this->recette;
+    }
+
+    public function setRecette(?Recette $recette): self
+    {
+        $this->recette = $recette;
+
+        return $this;
+    }
+
     public function getQuantity(): ?int
     {
         return $this->quantity;
@@ -284,6 +328,18 @@ class Action
         return $this;
     }
 
+    public function getKarma(): ?int
+    {
+        return $this->karma;
+    }
+
+    public function setKarma(?int $karma): self
+    {
+        $this->karma = $karma;
+
+        return $this;
+    }
+
     public function getMessage(): ?string
     {
         return $this->message;
@@ -292,6 +348,42 @@ class Action
     public function setMessage(?string $message): self
     {
         $this->message = $message;
+
+        return $this;
+    }
+
+    public function getNextSequence(): ?Sequence
+    {
+        return $this->nextSequence;
+    }
+
+    public function setNextSequence(?Sequence $nextSequence): self
+    {
+        $this->nextSequence = $nextSequence;
+
+        return $this;
+    }
+
+    public function getEndsQuest(): ?bool
+    {
+        return $this->endsQuest;
+    }
+
+    public function setEndsQuest(?bool $endsQuest): self
+    {
+        $this->endsQuest = $endsQuest;
+
+        return $this;
+    }
+
+    public function getRecompense(): ?Recompense
+    {
+        return $this->recompense;
+    }
+
+    public function setRecompense(?Recompense $recompense): self
+    {
+        $this->recompense = $recompense;
 
         return $this;
     }

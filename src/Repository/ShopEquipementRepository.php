@@ -22,7 +22,7 @@ class ShopEquipementRepository extends ServiceEntityRepository
 
     public function getEquipementsShop($id){
         return $this->createQueryBuilder('se')
-            ->select('equipement.id as idEquipement, equipement.nom as nomEquipement, equipement.icone, equipement.prixAchat, equipement.description descriptionEquipement',
+            ->select('equipement.id as idEquipement, equipement.nom as nomEquipement, equipement.icone, COALESCE(se.prix, equipement.prixAchat) as prixAchat, equipement.description descriptionEquipement',
                 'equipement.level_min as levelMinEquipement','positionEquipement.name', 'rarity.name as rarityName', 'positionEquipement.name as position')
             ->leftJoin('se.equipement', 'equipement')
             ->leftJoin('equipement.positionEquipement', 'positionEquipement')

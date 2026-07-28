@@ -31,4 +31,11 @@ final class GameContent
 
     /** Wrap par défaut posé par le MapMaker */
     public const DEFAULT_WRAP_ID = 1;
+
+    /**
+     * Durée pendant laquelle la salle au trésor reste ouverte après la mise à mort
+     * du boss (wrap de condition `boss`). Sera portée par le donjon lui-même quand
+     * le DonjonMaker existera.
+     */
+    public const FENETRE_SALLE_TRESOR_SECONDES = 3 * 3600;
 }

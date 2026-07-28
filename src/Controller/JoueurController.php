@@ -23,6 +23,11 @@ use App\Repository\UserConsommableRepository;
 use App\Repository\UserRepository;
 use App\Repository\UserSortilegeRepository;
 use App\Repository\WrapRepository;
+use App\Exception\DonjonException;
+use App\service\DonjonInstanceService;
+use App\service\DonjonMapView;
+use App\service\DonjonSalleService;
+use App\service\KarmaService;
 use App\service\MapService;
 use App\service\WrapService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -64,6 +69,10 @@ class JoueurController extends AbstractController
         $minimalPlayerData['experienceActuelle'] = $experienceAndLevel['experienceActuelle'];
         $minimalPlayerData['experienceMax'] = $experienceAndLevel['experienceMax'];
         $minimalPlayerData['niveau'] = $experienceAndLevel['niveau'];
+        // Le palier est calculé côté serveur : les seuils ne doivent exister qu'à un seul
+        // endroit (ArtisanatConfig), sinon le libellé lu par le joueur et celui qui
+        // conditionnera l'accès aux contenus finiraient par diverger.
+        $minimalPlayerData['karma'] = KarmaService::decrireValeur((int)$minimalPlayerData['karma']);
         return new JsonResponse($minimalPlayerData);
     }
 
@@ -333,30 +342,49 @@ class JoueurController extends AbstractController
     public function updateCasePosition(
         Request                 $request,
         CarteCarreauRepository  $carteCarreauRepository,
+        DonjonInstanceService   $donjonInstanceService,
+        DonjonMapView           $donjonMapView,
         EntityManagerInterface  $entityManager
     ): Response {
         $data = json_decode($request->getContent(), true);
         $user = $this->getUser();
         $mapId = $user->getMap()->getId();
         $returnMapInfo = [];
+
+        $instance = $donjonInstanceService->instanceCourante($user);
+        $enInstance = $instance !== null && $instance->contientCarte((int)$mapId);
+
         if($data['mapId'] == $mapId){
             $newCase = $carteCarreauRepository->findByCoordonnee($data['mapId'], $data['caseAbscisse'], $data['caseOrdonnee']);
 
-            if($newCase[0]->getJoueur() === null) {
-                $carteCarreauRepository->updatePlayerInCase($user);
+            // En instance, `carte_carreau.joueur_id` n'est ni lu ni écrit (OneToOne global,
+            // incompatible avec plusieurs groupes) : la collision se juge entre membres.
+            $occupee = $enInstance
+                ? $donjonMapView->positionOccupeeDansInstance(
+                    $instance->getId(), (int)$mapId,
+                    (int)$data['caseAbscisse'], (int)$data['caseOrdonnee'], $user->getId()
+                )
+                : $newCase[0]->getJoueur() !== null;
+
+            if(!$occupee) {
+                if(!$enInstance){
+                    $carteCarreauRepository->updatePlayerInCase($user);
+                }
                 $user->setCaseAbscisse($data['caseAbscisse']);
                 $user->setCaseOrdonnee($data['caseOrdonnee']);
                 $mouvementPoint = $user->getMouvementPoint() - 1;
                 $user->setMouvementPoint($mouvementPoint);
                 $entityManager->persist($user);
                 $entityManager->flush();
-                $newCase[0]->setJoueur($user);
-                $entityManager->persist($newCase[0]);
-                $entityManager->flush();
+                if(!$enInstance){
+                    $newCase[0]->setJoueur($user);
+                    $entityManager->persist($newCase[0]);
+                    $entityManager->flush();
+                }
             }
         }
 
-        $returnMapInfo['cases'] = $carteCarreauRepository->getAllCasesOfMap($mapId);
+        $returnMapInfo['cases'] = $donjonMapView->casesPourJoueur($user, $mapId)['cases'];
         $returnMapInfo['mapId'] = $mapId;
         $returnMapInfo['life'] = $user->getCurrentLife();
         $returnMapInfo['mana'] = $user->getCurrentMana();
@@ -375,6 +403,9 @@ class JoueurController extends AbstractController
         CarteCarreauRepository  $carteCarreauRepository,
         WrapRepository          $wrapRepository,
         CarteRepository         $carteRepository,
+        DonjonInstanceService   $donjonInstanceService,
+        DonjonSalleService      $donjonSalleService,
+        DonjonMapView           $donjonMapView,
         EntityManagerInterface  $entityManager
     ): Response {
         $data = json_decode($request->getContent(), true);
@@ -389,6 +420,44 @@ class JoueurController extends AbstractController
             $playerCanChangeMap = ['authorization' => true];
         }
 
+        $donjonCible = $donjonInstanceService->donjonDeLaCarte((int)$data['targetMapId']);
+        $instance = $donjonInstanceService->instanceCourante($user);
+
+        // Circuler DANS son propre donjon (salle 1 → salle 2) n'est pas une entrée : c'est
+        // un wrap ordinaire. Sans cette distinction on refaisait une entrée à chaque porte
+        // interne — et une instance expirée bloquait le joueur à l'intérieur, incapable
+        // même de rejoindre la sortie.
+        $resteDansSonDonjon = $donjonCible !== null
+            && $instance !== null
+            && $instance->getDonjon()?->getId() === $donjonCible->getId();
+
+        // Franchir une porte d'ENTRÉE = entrer dans une instance. Le verrou quotidien,
+        // le niveau minimum et la taille de groupe sont arbitrés par DonjonInstanceService ;
+        // un refus se présente au joueur comme un wrap bloqué.
+        if($playerCanChangeMap['authorization'] && !is_null($donjonCible) && !$resteDansSonDonjon){
+            try{
+                $instance = $donjonInstanceService->entrer($user, $donjonCible);
+            }catch(DonjonException $exception){
+                $playerCanChangeMap = ['authorization' => false, 'message' => $exception->getMessage()];
+            }
+        }
+
+        // Condition de salle (nettoyer, énigme, boss) : elle s'applique aussi bien à
+        // l'entrée dans le donjon qu'aux passages internes. Une porte franchie le reste.
+        if($playerCanChangeMap['authorization'] && !is_null($instance)){
+            try{
+                $donjonSalleService->verifierPassage($instance, (int)$data['targetMapId']);
+            }catch(DonjonException $exception){
+                $playerCanChangeMap = ['authorization' => false, 'message' => $exception->getMessage()];
+            }
+        }
+
+        // Sortir d'un donjon vers le monde ouvert : on quitte l'instance (elle reste
+        // acquise jusqu'au reset, on peut y revenir).
+        if($playerCanChangeMap['authorization'] && is_null($donjonCible)){
+            $donjonInstanceService->sortir($user);
+            $instance = null;
+        }
 
         if($playerCanChangeMap['authorization']){
             $newMap = $carteRepository->findOneBy(['id' => $data['targetMapId']]);
@@ -397,22 +466,41 @@ class JoueurController extends AbstractController
             $newCaseId = $mapService->getPositionAfterMapChange($mapCases, $data['targetWrap']);
             $newCaseEntity = $carteCarreauRepository->find($newCaseId);
 
+            $enInstance = $instance !== null;
+            $occupee = $enInstance
+                ? $donjonMapView->positionOccupeeDansInstance(
+                    $instance->getId(), (int)$data['targetMapId'],
+                    $newCaseEntity->getAbscisse(), $newCaseEntity->getOrdonnee(), $user->getId()
+                )
+                : $newCaseEntity->getJoueur() !== null;
 
-            if($newCaseEntity->getJoueur() === null) {
+            if(!$occupee) {
+                // Libère toujours la case du monde ouvert qu'on quittait, y compris en
+                // entrant en instance — sinon le joueur resterait « visible » dehors.
                 $carteCarreauRepository->updatePlayerInCase($user);
                 $user->setMap($newMap);
                 $user->setCaseAbscisse($newCaseEntity->getAbscisse());
                 $user->setCaseOrdonnee($newCaseEntity->getOrdonnee());
                 $entityManager->persist($user);
                 $entityManager->flush();
-                $newCaseEntity->setJoueur($user);
-                $entityManager->persist($newCaseEntity);
-                $entityManager->flush();
+                if(!$enInstance){
+                    $newCaseEntity->setJoueur($user);
+                    $entityManager->persist($newCaseEntity);
+                    $entityManager->flush();
+                }
             }
+            // La population de la salle n'apparaît qu'à la PREMIÈRE arrivée du groupe :
+            // sinon un aller-retour la referait naître (ferme à XP).
+            $annoncePopulation = is_null($instance)
+                ? null
+                : $donjonSalleService->peupler($instance, (int)$data['targetMapId']);
+
             $json = json_encode([
                 'mapId' =>$data['targetMapId'],
                 'ordonnee' => $newCaseEntity->getOrdonnee(),
-                'abscisse' => $newCaseEntity->getAbscisse()
+                'abscisse' => $newCaseEntity->getAbscisse(),
+                'instanceId' => $instance?->getId(),
+                'annonce' => $annoncePopulation
             ]);
         }else{
             $json = json_encode([

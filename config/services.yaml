@@ -4,12 +4,23 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices/configuration.html#application-related-configuration
 parameters:
+    # Racine des images uploadées depuis l'admin (un sous-dossier par collection : equipement,
+    # metier, objet, pnj, monstre, interaction). Ces sous-dossiers sont bind-montés depuis
+    # alcazan-front-prod/public/img/* (voir docker-compose.yaml) : le front sert donc
+    # immédiatement les images uploadées via l'admin, sans copie manuelle.
+    app.images_dir: '%kernel.project_dir%/public/img'
 
 services:
     # default configuration for services in *this* file
     _defaults:
         autowire: true      # Automatically injects dependencies in your services.
         autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+        bind:
+            string $imagesDir: '%app.images_dir%'
+            # Clé de signature partagée avec le hub Mercure + URL publique servie au front
+            # (voir MercureJwtFactory et docker-compose.yaml).
+            string $mercureJwtSecret: '%env(MERCURE_JWT_SECRET)%'
+            string $mercurePublicUrl: '%env(MERCURE_PUBLIC_URL)%'
 
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name

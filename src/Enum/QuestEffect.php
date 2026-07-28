@@ -19,12 +19,19 @@ enum QuestEffect: string {
     /** params: {"bossId": <id>} */
     case RECOMPENSE_BOSS = 'recompense_boss';
 
+    /**
+     * Levier d'énigme de donjon. Aucun paramètre : c'est la case elle-même qui identifie
+     * le levier, et la mécanique ENIGME_LEVIERS du donjon qui dit combien il en faut.
+     */
+    case ACTIONNER_LEVIER = 'actionner_levier';
+
     public function label(): string {
         return match ($this) {
             self::CHOISIR_CLASSE => 'Choisir une classe',
             self::CHOISIR_ALIGNEMENT => 'Choisir un alignement',
             self::ENTRER_AUBERGE => "Entrer à l'auberge",
             self::RECOMPENSE_BOSS => 'Récompense de boss',
+            self::ACTIONNER_LEVIER => 'Actionner un levier (donjon)',
         };
     }
 }

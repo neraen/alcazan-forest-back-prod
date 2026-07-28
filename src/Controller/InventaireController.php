@@ -2,19 +2,13 @@
 
 namespace App\Controller;
 
-use App\Entity\InventaireConsommable;
-use App\Entity\InventaireEquipement;
-use App\Entity\UserEquipement;
 use App\Repository\EquipementCaracteristiqueRepository;
-use App\Repository\EquipementRepository;
 use App\Repository\InventaireConsommableRepository;
 use App\Repository\InventaireEquipementRepository;
 use App\Repository\InventaireObjetRepository;
 use App\Repository\InventaireRepository;
-use App\Repository\JoueurCaracteristiqueBonusRepository;
 use App\Repository\UserEquipementRepository;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\EntityManagerInterface;
+use App\service\EquipementEquipeService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -77,128 +71,35 @@ class InventaireController extends AbstractController
 
     #[Route("/inventaire/equipement/unwear", name:"inventaire_equipement_unwear", methods: ["POST"])]
     public function unwearEquipement(
-        Request                                 $request,
-        UserEquipementRepository                $userEquipementRepository,
-        InventaireRepository                    $inventaireRepository,
-        EquipementRepository                    $equipementRepository,
-        InventaireEquipementRepository          $inventaireEquipementRepository,
-        JoueurCaracteristiqueBonusRepository    $joueurCaracteristiqueBonusRepository,
-        EntityManagerInterface                  $entityManager
+        Request                  $request,
+        EquipementEquipeService  $equipementEquipeService
     ): Response {
-        $userId = $this->getUser()->getId();
         $data = json_decode($request->getContent(), true);
 
-        $userEquipementEntity = $userEquipementRepository->findOneBy(['user' => $userId, 'equipement' => $data['idEquipement']]);
-        $entityManager->remove($userEquipementEntity);
-        $entityManager->flush();
-
-        $inventaireEntity = $inventaireRepository->findOneBy(['user' => $userId]);
-        $shouldIncrementExistingEquipement = $inventaireEquipementRepository->findOneBy(['inventaire' => $inventaireEntity->getId(), 'equipement' => $data['idEquipement']]);
-
-        if($shouldIncrementExistingEquipement){
-            $shouldIncrementExistingEquipement->setQuantity($shouldIncrementExistingEquipement->getQuantity() + 1);
-            $entityManager->persist($shouldIncrementExistingEquipement);
-            $entityManager->flush();
-        }else{
-            $inventaireEquipementEntity = new InventaireEquipement();
-            $equipementEntity = $equipementRepository->findOneBy(['id' =>  $data['idEquipement']]);
-            $inventaireEquipementEntity->setQuantity(1);
-            $inventaireEquipementEntity->setEquipement($equipementEntity);
-            $inventaireEquipementEntity->setInventaire($inventaireEntity);
-            $entityManager->persist($inventaireEquipementEntity);
-            $entityManager->flush();
+        try {
+            $equipementEquipeService->unwear($this->getUser(), (int) ($data['idEquipement'] ?? 0));
+        } catch (\DomainException $exception) {
+            return new JsonResponse(['error' => $exception->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
-        $caracteristiques = $equipementEntity->getEquipementCaracteristiques();
-        foreach ($caracteristiques as $caracteristique){
-            $caracteristiqueId = $caracteristique->getCaracteristique()->getId();
-            $joueurCaracteristiqueBonusEntity = $joueurCaracteristiqueBonusRepository->findOneBy(['caracteristique' => $caracteristiqueId, 'joueur' => $userId]);
-            if($joueurCaracteristiqueBonusEntity){
-                $valeurCaracteristique = $joueurCaracteristiqueBonusEntity->getPoints() - $caracteristique->getValeur() ;
-                $joueurCaracteristiqueBonusEntity->setPoints($valeurCaracteristique);
-                $entityManager->persist($joueurCaracteristiqueBonusEntity);
-                $entityManager->flush();
-            }
-
-        }
-
-        $json = json_encode([]);
-        return new Response($json);
+        return new JsonResponse([]);
     }
 
 
     #[Route("/inventaire/equipement/wear", name:"inventaire_equipement_wear", methods: ["POST"])]
     public function wearEquipement(
-        Request                                 $request,
-        UserEquipementRepository                $userEquipementRepository,
-        InventaireRepository                    $inventaireRepository,
-        EquipementRepository                    $equipementRepository,
-        InventaireEquipementRepository          $inventaireEquipementRepository,
-        JoueurCaracteristiqueBonusRepository    $joueurCaracteristiqueBonusRepository,
-        EntityManagerInterface                  $entityManager
+        Request                  $request,
+        EquipementEquipeService  $equipementEquipeService
     ): Response {
-
-        $userId = $this->getUser()->getId();
         $data = json_decode($request->getContent(), true);
 
-        $equipementEntity = $equipementRepository->findOneBy(['id' =>  $data['idEquipement']]);
-        $alreadyHaveEquipementInSamePosition = $userEquipementRepository->getEquipementEquipeByUserAndPosition($userId, $equipementEntity->getPositionEquipement()->getId());
-        $inventaireEntity = $inventaireRepository->findOneBy(['user' => $userId]);
-
-        if($alreadyHaveEquipementInSamePosition){
-            $entityManager->remove($alreadyHaveEquipementInSamePosition);
-            $entityManager->flush();
-
-            $shouldIncrementExistingEquipement = $inventaireEquipementRepository->findOneBy(['inventaire' => $inventaireEntity->getId(), 'equipement' => $alreadyHaveEquipementInSamePosition->getEquipement()->getId()]);
-
-            if($shouldIncrementExistingEquipement){
-                $shouldIncrementExistingEquipement->setQuantity($shouldIncrementExistingEquipement->getQuantity() + 1);
-                $entityManager->persist($shouldIncrementExistingEquipement);
-                $entityManager->flush();
-            } else {
-                $inventaireEquipementEntity = new InventaireEquipement();
-                $equipementEntity = $equipementRepository->findOneBy(['id' =>  $data['idEquipement']]);
-                $inventaireEquipementEntity->setQuantity(1);
-                $inventaireEquipementEntity->setEquipement($equipementEntity);
-                $inventaireEquipementEntity->setInventaire($inventaireEntity);
-                $entityManager->persist($inventaireEquipementEntity);
-                $entityManager->flush();
-            }
+        try {
+            $equipementEquipeService->wear($this->getUser(), (int) ($data['idEquipement'] ?? 0));
+        } catch (\DomainException $exception) {
+            return new JsonResponse(['error' => $exception->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
-        $inventaireEquipementToEquipEntity = $inventaireEquipementRepository->findOneBy(['inventaire' => $inventaireEntity->getId(), 'equipement' => $data['idEquipement']]);
-        $quantity = $inventaireEquipementToEquipEntity->getQuantity();
-
-        if($quantity === 1){
-            $entityManager->remove($inventaireEquipementToEquipEntity);
-            $entityManager->flush();
-        }else{
-            $inventaireEquipementToEquipEntity->setQuantity($quantity - 1);
-            $entityManager->persist($inventaireEquipementToEquipEntity);
-            $entityManager->flush();
-        }
-
-        $userEquipementEntity = new UserEquipement();
-        $userEquipementEntity->setEquipement($equipementEntity);
-        $userEquipementEntity->setUser($this->getUser());
-        $entityManager->persist($userEquipementEntity);
-        $entityManager->flush();
-
-        $caracteristiques = $equipementEntity->getEquipementCaracteristiques();
-        foreach ($caracteristiques as $caracteristique){
-            $caracteristiqueId = $caracteristique->getCaracteristique()->getId();
-            $joueurCaracteristiqueBonusEntity = $joueurCaracteristiqueBonusRepository->findOneBy(['caracteristique' => $caracteristiqueId, 'joueur' => $userId]);
-            if($joueurCaracteristiqueBonusEntity){
-                $valeurCaracteristique = $caracteristique->getValeur() + $joueurCaracteristiqueBonusEntity->getPoints();
-                $joueurCaracteristiqueBonusEntity->setPoints($valeurCaracteristique);
-                $entityManager->persist($joueurCaracteristiqueBonusEntity);
-                $entityManager->flush();
-            }
-
-        }
-
-        $json = json_encode([]);
-        return new Response($json);
+        return new JsonResponse([]);
     }
 
 }

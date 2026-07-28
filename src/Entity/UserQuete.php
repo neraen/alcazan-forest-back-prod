@@ -32,6 +32,24 @@ class UserQuete
     #[ORM\ManyToOne(targetEntity: Sequence::class, inversedBy: 'userQuetes')]
     private $sequence;
 
+    /**
+     * Où en étaient les compteurs du joueur quand il est ENTRÉ dans l'étape courante :
+     * {"monstre_tue:12": 47, "objet_fabrique:3": 2}.
+     *
+     * Sans cet instantané, « tuez 5 loups » se lirait sur un compteur cumulatif et se
+     * validerait instantanément pour tout joueur qui en a déjà tué cinq dans sa vie —
+     * la quête ne demanderait plus rien. Il est reposé à CHAQUE changement de séquence,
+     * et jamais quand le joueur reclique sur une étape qu'il n'a pas encore franchie :
+     * sinon sa progression repartirait de zéro à chaque tentative.
+     *
+     * Clé absente (étape entamée avant la mise en place, action rebranchée depuis) =
+     * départ 0, donc lecture cumulative : une dégradation lisible, jamais un blocage.
+     *
+     * @var array<string, int>|null
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $compteursDepart = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -83,5 +101,25 @@ class UserQuete
         $this->sequence = $sequence;
 
         return $this;
+    }
+
+    /** @return array<string, int> */
+    public function getCompteursDepart(): array
+    {
+        return $this->compteursDepart ?? [];
+    }
+
+    /** @param array<string, int> $compteursDepart */
+    public function setCompteursDepart(?array $compteursDepart): self
+    {
+        $this->compteursDepart = $compteursDepart === [] ? null : $compteursDepart;
+
+        return $this;
+    }
+
+    /** Valeur du compteur `$cle` au moment où le joueur a reçu l'étape (0 par défaut). */
+    public function getCompteurDepart(string $cle): int
+    {
+        return (int)($this->compteursDepart[$cle] ?? 0);
     }
 }

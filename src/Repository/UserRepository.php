@@ -29,7 +29,8 @@ class UserRepository extends ServiceEntityRepository //implements PasswordUpgrad
     public function getMinimalPlayerData($userId){
         return $this->createQueryBuilder('user')
             ->select('user.id as userId', 'user.currentLife', 'user.money', 'user.currentMana', 'user.maxLife', 'user.maxMana', 'user.pseudo', 'user.caseAbscisse',
-                'user.caseOrdonnee', 'user.sexe', 'user.actionPoint', 'user.mouvementPoint', 'user.money', 'user.tutorialActive', 'alignement.nom as nomAlignement',
+                'user.caseOrdonnee', 'user.sexe', 'user.actionPoint', 'user.mouvementPoint', 'user.money', 'user.tutorialActive', 'user.karma',
+                'alignement.nom as nomAlignement',
                 'alignement.icone as iconeAlignement', 'alignement.id as idAlignement', 'level.niveau as niveau', 'classe.nom as nomClasse',
                 'classe.id as classId', 'carte.id as mapId', 'guilde.nom as nomGuilde')
             ->leftJoin('user.niveauJoueur', 'niveauJoueur')

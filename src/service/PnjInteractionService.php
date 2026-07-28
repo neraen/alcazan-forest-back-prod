@@ -11,7 +11,7 @@ use App\Repository\SequenceRepository;
 /**
  * Construit la réponse de POST /api/pnj/interaction : lecture pure, aucun
  * effet de bord (l'ancien /api/pnj démarrait les quêtes à la consultation).
- * La vue est discriminée par "view" : quest | dialogue | shop | guilde.
+ * La vue est discriminée par "view" : quest | dialogue | shop | guilde | metier.
  */
 class PnjInteractionService
 {
@@ -20,7 +20,8 @@ class PnjInteractionService
         private readonly QuestProgressionService $questProgressionService,
         private readonly SequenceRepository $sequenceRepository,
         private readonly GuildeRepository $guildeRepository,
-        private readonly JoueurGuildeRepository $joueurGuildeRepository
+        private readonly JoueurGuildeRepository $joueurGuildeRepository,
+        private readonly MetierService $metierService
     ){}
 
     public function getInteraction(User $user, Pnj $pnj): array
@@ -48,6 +49,10 @@ class PnjInteractionService
                 $payload['view'] = 'guilde';
                 $payload['guilde'] = $this->buildGuildePayload($user, $pnj);
                 break;
+            case 'metier':
+                $payload['view'] = 'metier';
+                $payload['metier'] = $this->buildMetierPayload($user, $pnj);
+                break;
             case 'action':
             default:
                 $payload['view'] = 'dialogue';
@@ -64,6 +69,19 @@ class PnjInteractionService
         $sequence = $this->sequenceRepository->findOneBy(['pnj' => $pnj, 'quete' => null]);
 
         return $this->questProgressionService->buildStepPayload($sequence);
+    }
+
+    /**
+     * Maître de métier : son dialogue et ce qu'il enseigne. Même forme que la vue guilde
+     * (dialogue de la séquence sans quête + liste), et la liste vient de MetierService —
+     * l'unique point qui sache si un métier est appris et s'il reste une place.
+     */
+    private function buildMetierPayload(User $user, Pnj $pnj): array
+    {
+        $sequence = $this->sequenceRepository->findOneBy(['pnj' => $pnj, 'quete' => null]);
+
+        return ['dialogue' => $sequence?->getDialogueContenu() ?? '']
+            + $this->metierService->vueMaitre($user, $pnj);
     }
 
     /** Registre des guildes : comportement repris de l'ancien /api/pnj/guildes. */

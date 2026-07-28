@@ -65,6 +65,14 @@ class CarteCarreau
     #[ORM\ManyToOne(targetEntity: Wrap::class, inversedBy: 'carteCarreaus')]
     private $wrap;
 
+    /**
+     * Point interactif posé sur la case (ressource, coffre, levier). Distinct d'`$action`,
+     * qui est un bouton de séquence de quête : les interactions de carte sont un système
+     * à part entière (cf. Interaction).
+     */
+    #[ORM\ManyToOne(targetEntity: Interaction::class, inversedBy: 'carteCarreaus')]
+    private ?Interaction $interaction = null;
+
     public function __construct()
     {
         $this->monstreCarreaus = new ArrayCollection();
@@ -280,6 +288,18 @@ class CarteCarreau
     public function setBoss(?Boss $boss): self
     {
         $this->boss = $boss;
+
+        return $this;
+    }
+
+    public function getInteraction(): ?Interaction
+    {
+        return $this->interaction;
+    }
+
+    public function setInteraction(?Interaction $interaction): self
+    {
+        $this->interaction = $interaction;
 
         return $this;
     }

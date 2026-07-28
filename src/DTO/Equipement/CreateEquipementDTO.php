@@ -2,18 +2,25 @@
 
 namespace App\DTO\Equipement;
 
-use App\DTO\Equipement\Object\Equipement;
+use Symfony\Component\Validator\Constraints as Assert;
 
+/**
+ * Payload de POST /api/equipement/create : {"equipement": {...}}.
+ *
+ * Le contenu reste un tableau associatif : le formulaire d'admin envoie un mélange de champs
+ * scalaires et de caractéristiques, et le contrôleur le consomme tel quel.
+ */
 class CreateEquipementDTO
 {
-    private Equipement $equipement;
+    #[Assert\NotBlank]
+    private array $equipement = [];
 
-    public function getEquipement(): Equipement
+    public function getEquipement(): array
     {
         return $this->equipement;
     }
 
-    public function setEquipement(Equipement $equipement): self
+    public function setEquipement(array $equipement): self
     {
         $this->equipement = $equipement;
 

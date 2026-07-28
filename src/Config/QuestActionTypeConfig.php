@@ -92,8 +92,40 @@ final class QuestActionTypeConfig
                     ['name' => 'quantity', 'type' => 'number', 'label' => 'Nombre de kills'],
                 ],
             ],
+            // Les trois types comptables. Leur quantité se mesure DEPUIS l'entrée du
+            // joueur dans l'étape : le libellé du champ le dit, sinon l'auteur de quête
+            // croirait demander un total de partie.
+            ActionType::BATTRE_MONSTRE => [
+                'label' => 'Battre des monstres',
+                'isCondition' => true,
+                'fields' => [
+                    ['name' => 'monstreId', 'type' => 'select', 'label' => 'Monstre', 'catalog' => 'monstres'],
+                    ['name' => 'quantity', 'type' => 'number', 'label' => 'Nombre à vaincre (depuis cette étape)'],
+                ],
+            ],
+            ActionType::FABRIQUER_OBJET => [
+                'label' => 'Fabriquer un objet (métier)',
+                'isCondition' => true,
+                'fields' => [
+                    ['name' => 'recetteId', 'type' => 'select', 'label' => 'Recette', 'catalog' => 'recettes'],
+                    ['name' => 'quantity', 'type' => 'number', 'label' => 'Nombre à fabriquer (depuis cette étape)'],
+                ],
+            ],
+            ActionType::RECOLTER_RESSOURCE => [
+                'label' => 'Récolter une ressource (métier)',
+                'isCondition' => true,
+                'fields' => [
+                    ['name' => 'objetId', 'type' => 'select', 'label' => 'Ressource', 'catalog' => 'ressources'],
+                    ['name' => 'quantity', 'type' => 'number', 'label' => 'Quantité à récolter (depuis cette étape)'],
+                ],
+            ],
             ActionType::PASSER_DIALOGUE => [
                 'label' => 'Passer le dialogue',
+                'isCondition' => false,
+                'fields' => [],
+            ],
+            ActionType::CHOIX => [
+                'label' => 'Choix (branchement)',
                 'isCondition' => false,
                 'fields' => [],
             ],

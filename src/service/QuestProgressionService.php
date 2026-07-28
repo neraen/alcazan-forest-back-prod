@@ -9,14 +9,12 @@ use App\Entity\Sequence;
 use App\Entity\User;
 use App\Entity\UserQuete;
 use App\Enum\ActionType;
+use App\Enum\TypeCompteur;
+use App\Enum\TypeItem;
 use App\Exception\QuestException;
 use App\Exception\UnsupportedQuestActionException;
 use App\Repository\ActionRepository;
 use App\Repository\CarteCarreauRepository;
-use App\Repository\InventaireConsommableRepository;
-use App\Repository\InventaireEquipementRepository;
-use App\Repository\InventaireObjetRepository;
-use App\Repository\InventaireRepository;
 use App\Repository\NiveauJoueurRepository;
 use App\Repository\SequenceRepository;
 use App\Repository\UserBossRepository;
@@ -32,6 +30,20 @@ use Doctrine\ORM\EntityManagerInterface;
  * {status, quest, step, blockedMessages, feedback: {rewards, messages}, needRefresh}
  * — status ∈ step | blocked | done | locked. Aucun HTML : le front rend
  * dialogue.paragraphs et les messages en texte brut.
+ *
+ * Deux mécaniques transverses passent par ici et nulle part ailleurs :
+ *
+ *  - **Le karma des choix.** Une action peut porter un `karma` (positif ou négatif),
+ *    appliqué APRÈS que la condition est remplie et le coût payé — un choix refusé
+ *    ne vaut aucun jugement moral. L'ajustement passe par KarmaService, seul point
+ *    de mutation, qui borne la valeur.
+ *
+ *  - **Les objectifs comptés** (BATTRE_MONSTRE, FABRIQUER_OBJET, RECOLTER_RESSOURCE).
+ *    Les compteurs de `joueur_compteur` sont cumulatifs à vie ; ce qui rend l'objectif
+ *    demandable est l'INSTANTANÉ pris à l'entrée dans l'étape
+ *    (`user_quete.compteurs_depart`), reposé à chaque changement de séquence et
+ *    jamais pendant qu'on piétine sur la même. « Tuez 5 loups » veut donc dire cinq
+ *    loups depuis la demande, pas cinq loups dans une vie.
  */
 class QuestProgressionService
 {
@@ -39,16 +51,14 @@ class QuestProgressionService
         private readonly SequenceRepository $sequenceRepository,
         private readonly UserQueteRepository $userQueteRepository,
         private readonly ActionRepository $actionRepository,
-        private readonly InventaireRepository $inventaireRepository,
-        private readonly InventaireObjetRepository $inventaireObjetRepository,
-        private readonly InventaireEquipementRepository $inventaireEquipementRepository,
-        private readonly InventaireConsommableRepository $inventaireConsommableRepository,
         private readonly NiveauJoueurRepository $niveauJoueurRepository,
         private readonly UserBossRepository $userBossRepository,
         private readonly CarteCarreauRepository $carteCarreauRepository,
-        private readonly InventaireService $inventaireService,
-        private readonly LevelingService $levelingService,
+        private readonly SacService $sacService,
+        private readonly RecompenseService $recompenseService,
         private readonly QuestEffectRegistry $effectRegistry,
+        private readonly CompteurJoueurService $compteurJoueurService,
+        private readonly KarmaService $karmaService,
         private readonly EntityManagerInterface $entityManager
     ){}
 
@@ -74,7 +84,7 @@ class QuestProgressionService
 
             return $questInfo + [
                 'status' => 'inProgress',
-                'step' => $this->buildStepPayload($userQuete->getSequence()),
+                'step' => $this->buildStepPayload($userQuete->getSequence(), $user, $userQuete),
             ];
         }
 
@@ -108,7 +118,7 @@ class QuestProgressionService
                 return $this->buildResponse('done', $questInfo);
             }
 
-            return $this->buildResponse('step', $questInfo, $this->buildStepPayload($existing->getSequence()));
+            return $this->buildResponse('step', $questInfo, $this->buildStepPayload($existing->getSequence(), $user, $existing));
         }
 
         $lockedReasons = $this->checkPrerequisites($user, $quete);
@@ -126,10 +136,13 @@ class QuestProgressionService
         $userQuete->setQuete($quete);
         $userQuete->setSequence($firstSequence);
         $userQuete->setIsDone(false);
+        // Photo des compteurs AVANT que le joueur ne commence : sans elle, une première
+        // étape « tuez 5 loups » serait déjà remplie pour qui en a tué cinq autrefois.
+        $this->snapshotCompteurs($user, $userQuete, $firstSequence);
         $this->entityManager->persist($userQuete);
         $this->entityManager->flush();
 
-        return $this->buildResponse('step', $questInfo, $this->buildStepPayload($firstSequence));
+        return $this->buildResponse('step', $questInfo, $this->buildStepPayload($firstSequence, $user, $userQuete));
     }
 
     /**
@@ -175,12 +188,12 @@ class QuestProgressionService
                 throw new UnsupportedQuestActionException($type ?? ActionType::CHOIX);
             }
 
-            if (!$this->isActionConditionMet($action, $user)) {
+            if (!$this->isActionConditionMet($action, $user, $userQuete)) {
                 return $this->buildResponse(
                     'blocked',
                     $questInfo,
-                    $this->buildStepPayload($sequence),
-                    blockedMessages: [$this->blockedMessage($action)]
+                    $this->buildStepPayload($sequence, $user, $userQuete),
+                    blockedMessages: [$this->blockedMessage($action, $user, $userQuete)]
                 );
             }
 
@@ -198,24 +211,37 @@ class QuestProgressionService
                 $needRefresh = $needRefresh || $effectResult['needRefresh'];
             }
 
+            // Le karma vient APRÈS la condition et le coût : un choix que le joueur n'a
+            // pas pu tenir n'engage pas sa réputation. Il vaut aussi pour les dialogues
+            // autonomes — un PNJ sans quête peut proposer un choix qui compte.
+            $karma = $this->applyActionKarma($user, $action, $effectMessages);
+
+            // La récompense est portée par l'action jouée (par branche/choix).
+            ['rewards' => $rewards, 'playerXp' => $playerXp] = $this->giveActionReward($user, $action);
+            $needRefresh = $needRefresh || $rewards !== [];
+
             // Dialogue autonome (PNJ "action") : pas de progression à gérer.
             if ($quete === null) {
                 return $this->buildResponse(
                     'done',
                     null,
-                    $this->buildStepPayload($sequence),
+                    $this->buildStepPayload($sequence, $user),
+                    rewards: $rewards,
                     feedbackMessages: $effectMessages,
-                    needRefresh: $needRefresh
+                    needRefresh: $needRefresh,
+                    playerXp: $playerXp,
+                    karma: $karma
                 );
             }
 
-            ['rewards' => $rewards, 'playerXp' => $playerXp] = $this->giveSequenceReward($user, $sequence);
-            $needRefresh = $needRefresh || $rewards !== [];
-
-            $nextSequence = $this->sequenceRepository->findOneBy([
-                'quete' => $quete,
-                'position' => $sequence->getPosition() + 1,
-            ]);
+            // Branchement : un choix peut terminer la quête, sauter vers une
+            // séquence précise, ou (par défaut) suivre l'ordre linéaire position + 1.
+            $nextSequence = $action->getEndsQuest() === true
+                ? null
+                : ($action->getNextSequence() ?? $this->sequenceRepository->findOneBy([
+                    'quete' => $quete,
+                    'position' => $sequence->getPosition() + 1,
+                ]));
 
             if ($nextSequence === null) {
                 $userQuete->setIsDone(true);
@@ -227,21 +253,27 @@ class QuestProgressionService
                     rewards: $rewards,
                     feedbackMessages: $effectMessages,
                     needRefresh: $needRefresh,
-                    playerXp: $playerXp
+                    playerXp: $playerXp,
+                    karma: $karma
                 );
             }
 
             $userQuete->setSequence($nextSequence);
+            // Nouvelle étape = nouvelle photo des compteurs. C'est le SEUL moment où
+            // l'instantané est reposé : le faire à chaque tentative remettrait la
+            // progression de « tuez 5 loups » à zéro dès que le joueur reclique.
+            $this->snapshotCompteurs($user, $userQuete, $nextSequence);
             $this->entityManager->persist($userQuete);
 
             return $this->buildResponse(
                 'step',
                 $questInfo,
-                $this->buildStepPayload($nextSequence),
+                $this->buildStepPayload($nextSequence, $user, $userQuete),
                 rewards: $rewards,
                 feedbackMessages: $effectMessages,
                 needRefresh: $needRefresh,
-                playerXp: $playerXp
+                playerXp: $playerXp,
+                karma: $karma
             );
         });
     }
@@ -275,13 +307,31 @@ class QuestProgressionService
             throw new QuestException("L'action « {$action->getName()} » n'a pas d'effet configuré.");
         }
 
-        return $this->entityManager->wrapInTransaction(
-            fn (): array => $this->effectRegistry->execute($effect, $action->getEffectParams() ?? [], $user)
-        );
+        // La case est fournie aux effets : un levier de donjon a besoin de savoir LEQUEL
+        // il est, et cette information n'a pas à être recopiée à la main dans les params.
+        $params = ($action->getEffectParams() ?? []) + ['carteCarreauId' => $case->getId()];
+
+        return $this->entityManager->wrapInTransaction(function () use ($effect, $params, $user, $action): array {
+            $resultat = $this->effectRegistry->execute($effect, $params, $user);
+            // Une action posée sur une case est la MÊME entité qu'un bouton de quête :
+            // si l'auteur y a mis du karma, il doit compter ici aussi, sinon la même
+            // fiche se comporterait différemment selon l'endroit où elle est branchée.
+            $resultat['karma'] = $this->applyActionKarma($user, $action, $resultat['messages']);
+
+            return $resultat;
+        });
     }
 
-    /** Payload d'une étape : dialogue en paragraphes + boutons typés. Aucun HTML. */
-    public function buildStepPayload(?Sequence $sequence): ?array
+    /**
+     * Payload d'une étape : dialogue en paragraphes + boutons typés. Aucun HTML.
+     *
+     * `$user` et `$userQuete` sont facultatifs : sans eux (dialogue autonome, appels
+     * de lecture qui n'ont pas la progression sous la main) le payload est identique,
+     * simplement sans la clé `progress`. Un bouton d'objectif compté porte
+     * `progress: {current, target, unit}` — le joueur doit pouvoir lire « 3 / 10 »
+     * plutôt que de cliquer à l'aveugle pour savoir où il en est.
+     */
+    public function buildStepPayload(?Sequence $sequence, ?User $user = null, ?UserQuete $userQuete = null): ?array
     {
         if ($sequence === null) {
             return null;
@@ -290,11 +340,18 @@ class QuestProgressionService
         $actions = [];
         foreach ($sequence->getSequenceActions() as $sequenceAction) {
             $action = $sequenceAction->getAction();
-            $actions[] = [
+            $payload = [
                 'actionId' => $action->getId(),
                 'type' => $action->getActionType()?->name,
                 'label' => $action->getName(),
             ];
+
+            $progress = $user !== null ? $this->buildProgress($action, $user, $userQuete) : null;
+            if ($progress !== null) {
+                $payload['progress'] = $progress;
+            }
+
+            $actions[] = $payload;
         }
 
         return [
@@ -341,20 +398,30 @@ class QuestProgressionService
         return $reasons;
     }
 
-    /** Vérifie la condition d'une action sans rien consommer. */
-    public function isActionConditionMet(Action $action, User $user): bool
+    /**
+     * Vérifie la condition d'une action sans rien consommer.
+     *
+     * `$userQuete` porte l'instantané des compteurs : il n'est nul que pour les
+     * dialogues autonomes, qui ne portent aucun objectif compté.
+     */
+    public function isActionConditionMet(Action $action, User $user, ?UserQuete $userQuete = null): bool
     {
+        $compteur = $action->getActionType()?->compteur();
+        if ($compteur !== null) {
+            return $this->verifyCompteur($action, $user, $userQuete) >= max(1, (int)$action->getQuantity());
+        }
+
         return match ($action->getActionType()) {
             ActionType::DONNER_OBJET,
             ActionType::POSSEDER_OBJET => $this->userHasObjet($user, $action->getObjet()?->getId() ?? 0, max(1, (int)$action->getQuantity())),
-            ActionType::DONNER_OR => $user->getMoney() >= $action->getQuantity(),
+            ActionType::DONNER_OR => $this->sacService->orDisponible($user) >= $action->getQuantity(),
             ActionType::DONNER_EQUIPEMENT => $this->verifyEquipementInventaire($action, $user),
             ActionType::DONNER_CONSOMMABLE => $this->verifyConsommableInventaire($action, $user),
             ActionType::ATTEINDRE_LEVEL => ($this->niveauJoueurRepository->getPlayerLevel($user->getId()) ?? 1) >= $action->getQuantity(),
             ActionType::BATTRE_BOSS => $this->verifyBossKilled($action, $user),
             ActionType::PARLER_PNJ => $this->verifyPnjProximity($action, $user),
             ActionType::VISITER_CARTE => $this->verifyCarteVisited($action, $user),
-            ActionType::SCRIPTED_EFFECT, ActionType::PASSER_DIALOGUE => true,
+            ActionType::SCRIPTED_EFFECT, ActionType::PASSER_DIALOGUE, ActionType::CHOIX => true,
             default => throw new UnsupportedQuestActionException($action->getActionType()),
         };
     }
@@ -362,74 +429,38 @@ class QuestProgressionService
     /** Consomme le coût d'une action DONNER_* (après isActionConditionMet). */
     private function consumeActionCost(Action $action, User $user): void
     {
-        switch ($action->getActionType()) {
-            case ActionType::DONNER_OR:
-                $user->setMoney($user->getMoney() - $action->getQuantity());
-                $this->entityManager->persist($user);
-                break;
-            case ActionType::DONNER_OBJET:
-                $inventaire = $this->inventaireRepository->findOneBy(['user' => $user]);
-                $line = $this->inventaireObjetRepository->findOneBy(['inventaire' => $inventaire, 'objet' => $action->getObjet()]);
-                $this->decrementInventoryLine($line, max(1, (int)$action->getQuantity()));
-                break;
-            case ActionType::DONNER_EQUIPEMENT:
-                $inventaire = $this->inventaireRepository->findOneBy(['user' => $user]);
-                $line = $this->inventaireEquipementRepository->findOneBy(['inventaire' => $inventaire, 'equipement' => $action->getEquipement()]);
-                $this->decrementInventoryLine($line, max(1, (int)$action->getQuantity()));
-                break;
-            case ActionType::DONNER_CONSOMMABLE:
-                $inventaire = $this->inventaireRepository->findOneBy(['user' => $user]);
-                $line = $this->inventaireConsommableRepository->findOneBy(['inventaire' => $inventaire, 'consommable' => $action->getConsommable()]);
-                $this->decrementInventoryLine($line, max(1, (int)$action->getQuantity()));
-                break;
-            default:
-                break;
+        try {
+            switch ($action->getActionType()) {
+                case ActionType::DONNER_OR:
+                    $this->sacService->debiterOr($user, max(0, (int) $action->getQuantity()));
+                    break;
+                case ActionType::DONNER_OBJET:
+                    $this->sacService->retirerItem($user, TypeItem::OBJET, $action->getObjet()?->getId() ?? 0, max(1, (int) $action->getQuantity()));
+                    break;
+                case ActionType::DONNER_EQUIPEMENT:
+                    $this->sacService->retirerItem($user, TypeItem::EQUIPEMENT, $action->getEquipement()?->getId() ?? 0, max(1, (int) $action->getQuantity()));
+                    break;
+                case ActionType::DONNER_CONSOMMABLE:
+                    $this->sacService->retirerItem($user, TypeItem::CONSOMMABLE, $action->getConsommable()?->getId() ?? 0, max(1, (int) $action->getQuantity()));
+                    break;
+                default:
+                    break;
+            }
+        } catch (\DomainException $exception) {
+            // Les messages de SacService sont déjà en français et destinés au joueur.
+            throw new QuestException($exception->getMessage());
         }
     }
 
     /**
-     * Donne la récompense de la séquence. Renvoie :
+     * Donne la récompense de l'action jouée (par branche/choix). Renvoie :
      *  - 'rewards'  : items obtenus [{type, label, quantity}] pour le feedback front ;
      *  - 'playerXp' : {experience, level, experienceMax} si de l'XP a été donnée
      *    (pour que le front rafraîchisse la barre/le niveau sans rechargement), sinon null.
      */
-    private function giveSequenceReward(User $user, Sequence $sequence): array
+    private function giveActionReward(User $user, Action $action): array
     {
-        $recompense = $sequence->getRecompense();
-        if ($recompense === null) {
-            return ['rewards' => [], 'playerXp' => null];
-        }
-
-        $rewards = [];
-        $playerXp = null;
-        $quantity = max(1, (int)$recompense->getQuantity());
-
-        if ($recompense->getEquipement() !== null) {
-            $this->inventaireService->addEquipementToUserInventaire($user->getId(), $recompense->getEquipement()->getId());
-            $rewards[] = ['type' => 'equipement', 'label' => $recompense->getEquipement()->getNom(), 'quantity' => 1];
-        }
-
-        if ($recompense->getConsommable() !== null) {
-            $this->inventaireService->addConsommableToUserInventaire($user->getId(), $recompense->getConsommable()->getId(), $quantity);
-            $rewards[] = ['type' => 'consommable', 'label' => $recompense->getConsommable()->getNom(), 'quantity' => $quantity];
-        }
-
-        if ($recompense->getObjet() !== null) {
-            $this->inventaireService->addObjetToUserInventaire($user->getId(), $recompense->getObjet()->getId(), $quantity);
-            $rewards[] = ['type' => 'objet', 'label' => $recompense->getObjet()->getName(), 'quantity' => $quantity];
-        }
-
-        if ($recompense->getMoney() !== null && $recompense->getMoney() > 0) {
-            $this->inventaireService->giveMoneyToUser($user, $recompense->getMoney());
-            $rewards[] = ['type' => 'or', 'label' => "pièces d'or", 'quantity' => $recompense->getMoney()];
-        }
-
-        if ($recompense->getExperience() !== null && $recompense->getExperience() > 0) {
-            $playerXp = $this->levelingService->giveExperienceToAPlayer($recompense->getExperience(), $user->getId());
-            $rewards[] = ['type' => 'experience', 'label' => "points d'expérience", 'quantity' => $recompense->getExperience()];
-        }
-
-        return ['rewards' => $rewards, 'playerXp' => $playerXp];
+        return $this->recompenseService->distribuer($user, $action->getRecompense());
     }
 
     private function buildResponse(
@@ -440,7 +471,8 @@ class QuestProgressionService
         array $blockedMessages = [],
         array $feedbackMessages = [],
         bool $needRefresh = false,
-        ?array $playerXp = null
+        ?array $playerXp = null,
+        ?array $karma = null
     ): array {
         return [
             'status' => $status,
@@ -454,6 +486,113 @@ class QuestProgressionService
             'needRefresh' => $needRefresh,
             // {experience, level, experienceMax} après un gain d'XP de quête, sinon null.
             'playerXp' => $playerXp,
+            // {karma, palier, delta} quand le choix joué a bougé le karma, sinon null —
+            // même forme que ce que renvoient la récolte et la fabrication.
+            'karma' => $karma,
+        ];
+    }
+
+    /**
+     * Applique le karma porté par l'action jouée et ajoute la phrase de feedback.
+     *
+     * Renvoie null quand rien n'a bougé — soit l'action n'engage aucun karma, soit la
+     * borne était déjà atteinte. Annoncer « karma +5 » à un joueur déjà au maximum
+     * serait un mensonge que `KarmaService::ajuster` permet précisément d'éviter
+     * (`delta` = l'ajustement RÉELLEMENT appliqué).
+     *
+     * @param string[] $messages complété en place
+     */
+    private function applyActionKarma(User $user, Action $action, array &$messages): ?array
+    {
+        $delta = (int)($action->getKarma() ?? 0);
+        if ($delta === 0) {
+            return null;
+        }
+
+        $ajustement = $this->karmaService->ajuster($user, $delta);
+        if ($ajustement['delta'] === 0) {
+            return null;
+        }
+
+        $messages[] = sprintf(
+            $ajustement['delta'] > 0
+                ? "Votre conduite vous honore (karma %+d)."
+                : "Ce choix vous coûte en réputation (karma %+d).",
+            $ajustement['delta']
+        );
+
+        return $ajustement;
+    }
+
+    /**
+     * Photographie les compteurs lus par les actions de `$sequence`.
+     *
+     * Seuls les compteurs effectivement visés sont enregistrés : l'instantané reste
+     * minuscule et une action rebranchée sur une autre cible ne traîne pas de départ
+     * périmé. Une clé absente vaut 0, c'est-à-dire une lecture cumulative — visible
+     * dans le compte affiché au joueur, jamais bloquante.
+     */
+    private function snapshotCompteurs(User $user, UserQuete $userQuete, Sequence $sequence): void
+    {
+        $depart = [];
+        foreach ($sequence->getSequenceActions() as $sequenceAction) {
+            $action = $sequenceAction->getAction();
+            $compteur = $action->getActionType()?->compteur();
+            if ($compteur === null) {
+                continue;
+            }
+
+            $cibleId = $this->cibleCompteur($action, $compteur);
+            if ($cibleId <= 0) {
+                continue;
+            }
+
+            $depart[$compteur->cle($cibleId)] = $this->compteurJoueurService->valeur($user, $compteur, $cibleId);
+        }
+
+        $userQuete->setCompteursDepart($depart);
+    }
+
+    /** Progression du joueur sur l'objectif compté d'une action, depuis l'instantané. */
+    private function verifyCompteur(Action $action, User $user, ?UserQuete $userQuete): int
+    {
+        $compteur = $action->getActionType()?->compteur();
+        if ($compteur === null) {
+            return 0;
+        }
+
+        $cibleId = $this->cibleCompteur($action, $compteur);
+        if ($cibleId <= 0) {
+            return 0;
+        }
+
+        $depart = $userQuete?->getCompteurDepart($compteur->cle($cibleId)) ?? 0;
+
+        return $this->compteurJoueurService->progression($user, $compteur, $cibleId, $depart);
+    }
+
+    /** Quelle cible d'action porte le compteur : le type le dit (cf. TypeCompteur). */
+    private function cibleCompteur(Action $action, TypeCompteur $compteur): int
+    {
+        return match ($compteur) {
+            TypeCompteur::MONSTRE_TUE => (int)($action->getMonstre()?->getId() ?? 0),
+            TypeCompteur::OBJET_FABRIQUE => (int)($action->getRecette()?->getId() ?? 0),
+            TypeCompteur::RESSOURCE_RECOLTEE => (int)($action->getObjet()?->getId() ?? 0),
+        };
+    }
+
+    /** {current, target, unit} pour un bouton d'objectif compté — null sinon. */
+    private function buildProgress(Action $action, User $user, ?UserQuete $userQuete): ?array
+    {
+        $compteur = $action->getActionType()?->compteur();
+        if ($compteur === null) {
+            return null;
+        }
+
+        return [
+            'current' => $this->verifyCompteur($action, $user, $userQuete),
+            'target' => max(1, (int)$action->getQuantity()),
+            'unit' => $compteur->unite(),
         ];
     }
 
@@ -468,11 +607,22 @@ class QuestProgressionService
         throw new QuestException("Cette action n'appartient pas à cette étape.");
     }
 
-    private function blockedMessage(Action $action): string
+    private function blockedMessage(Action $action, ?User $user = null, ?UserQuete $userQuete = null): string
     {
         $message = trim((string)$action->getMessage());
         if ($message !== '') {
             return $message;
+        }
+
+        // Objectif compté : le message par défaut donne le chiffre. « Condition non
+        // remplie » sur une chasse laisserait le joueur sans savoir s'il lui reste un
+        // monstre ou dix.
+        $compteur = $action->getActionType()?->compteur();
+        if ($compteur !== null && $user !== null) {
+            $cible = max(1, (int)$action->getQuantity());
+            $fait = $this->verifyCompteur($action, $user, $userQuete);
+
+            return "Ce n'est pas encore fait : {$fait} / {$cible} {$compteur->unite()}.";
         }
 
         return match ($action->getActionType()) {
@@ -509,31 +659,27 @@ class QuestProgressionService
         return array_values(array_filter(array_map('trim', $lines), fn (string $line) => $line !== ''));
     }
 
+    // Les possessions sont mesurées sur le DISPONIBLE (possédé − réservé par un échange) :
+    // un objet promis à un autre joueur ne peut pas servir à valider ou payer une quête.
     private function userHasObjet(User $user, int $objetId, int $quantity): bool
     {
         if ($objetId <= 0) {
             return false;
         }
-        $inventaire = $this->inventaireRepository->findOneBy(['user' => $user]);
-        $line = $this->inventaireObjetRepository->findOneBy(['inventaire' => $inventaire, 'objet' => $objetId]);
 
-        return $line !== null && $line->getQuantity() >= $quantity;
+        return $this->sacService->quantiteDisponible($user, TypeItem::OBJET, $objetId) >= $quantity;
     }
 
     private function verifyEquipementInventaire(Action $action, User $user): bool
     {
-        $inventaire = $this->inventaireRepository->findOneBy(['user' => $user]);
-        $line = $this->inventaireEquipementRepository->findOneBy(['inventaire' => $inventaire, 'equipement' => $action->getEquipement()]);
-
-        return $line !== null && $line->getQuantity() >= max(1, (int)$action->getQuantity());
+        return $this->sacService->quantiteDisponible($user, TypeItem::EQUIPEMENT, $action->getEquipement()?->getId() ?? 0)
+            >= max(1, (int) $action->getQuantity());
     }
 
     private function verifyConsommableInventaire(Action $action, User $user): bool
     {
-        $inventaire = $this->inventaireRepository->findOneBy(['user' => $user]);
-        $line = $this->inventaireConsommableRepository->findOneBy(['inventaire' => $inventaire, 'consommable' => $action->getConsommable()]);
-
-        return $line !== null && $line->getQuantity() >= max(1, (int)$action->getQuantity());
+        return $this->sacService->quantiteDisponible($user, TypeItem::CONSOMMABLE, $action->getConsommable()?->getId() ?? 0)
+            >= max(1, (int) $action->getQuantity());
     }
 
     private function verifyBossKilled(Action $action, User $user): bool
@@ -568,18 +714,4 @@ class QuestProgressionService
             && $user->getMap()->getId() === $action->getCarte()->getId();
     }
 
-    private function decrementInventoryLine(?object $line, int $quantity): void
-    {
-        if ($line === null) {
-            throw new QuestException("Ressource introuvable dans l'inventaire.");
-        }
-
-        $newQuantity = $line->getQuantity() - $quantity;
-        if ($newQuantity <= 0) {
-            $this->entityManager->remove($line);
-        } else {
-            $line->setQuantity($newQuantity);
-            $this->entityManager->persist($line);
-        }
-    }
 }

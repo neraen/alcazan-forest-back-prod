@@ -24,10 +24,15 @@ class MonstreController extends AbstractController
     }
 
     #[Route("/monstre/create", name:"monstre_create", methods: ["POST"])]
-    public function createMonster(Request $request, EntityManagerInterface $entityManager): Response {
+    public function createMonster(Request $request, EntityManagerInterface $entityManager, MonstreRepository $monstreRepository): Response {
         $data = json_decode($request->getContent(), true);
         $monstre = $data['monstre'];
-        $monstreEntity = new Monstre();
+
+        // id présent => édition d'un monstre existant, sinon création.
+        $monstreEntity = !empty($monstre['id']) ? $monstreRepository->find($monstre['id']) : new Monstre();
+        if ($monstreEntity === null) {
+            return new JsonResponse(['error' => 'Monstre introuvable.'], Response::HTTP_BAD_REQUEST);
+        }
 
         $monstreEntity->setName($monstre['name']);
         $monstreEntity->setMaxLife($monstre['maxLife']);

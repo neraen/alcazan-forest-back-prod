@@ -43,6 +43,8 @@ class SpellServiceTest extends TestCase
             $this->createMock(UserBossRepository::class),
             $this->userBuffRepository,
             $this->createMock(BuffCaracteristiqueRepository::class),
+            $this->createMock(\App\service\DonjonInstanceService::class),
+            $this->createMock(\App\service\DonjonCombatService::class),
             $this->createMock(EntityManagerInterface::class)
         );
     }

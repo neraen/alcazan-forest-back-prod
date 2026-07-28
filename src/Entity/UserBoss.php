@@ -27,6 +27,13 @@ class UserBoss
     #[ORM\Column(type: 'integer')]
     private $numberKill;
 
+    /**
+     * Dernier ramassage du butin du boss. Le coffre n'est lootable qu'une fois
+     * par mise à mort : `lastLoot` null ou antérieur à `lastKill` = butin disponible.
+     */
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $lastLoot = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -78,5 +85,24 @@ class UserBoss
         $this->numberKill = $numberKill;
 
         return $this;
+    }
+
+    public function getLastLoot(): ?\DateTimeInterface
+    {
+        return $this->lastLoot;
+    }
+
+    public function setLastLoot(?\DateTimeInterface $lastLoot): self
+    {
+        $this->lastLoot = $lastLoot;
+
+        return $this;
+    }
+
+    /** Le butin de la dernière mise à mort n'a pas encore été ramassé. */
+    public function butinDisponible(): bool
+    {
+        return $this->lastKill !== null
+            && ($this->lastLoot === null || $this->lastLoot < $this->lastKill);
     }
 }

@@ -125,6 +125,16 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     #[ORM\Column(type: "integer", nullable: true)]
     private $honneur;
 
+    /**
+     * Karma écologique : la trace de la manière dont le joueur prend au monde.
+     *
+     * VOLONTAIREMENT distinct de `honneur` (conduite en PvP) et d'`alignement` (camp
+     * choisi) : les fusionner ferait qu'un pillard de gisements perdrait sa réputation
+     * de duelliste, ce qui n'a rien à voir. Muté UNIQUEMENT par KarmaService.
+     */
+    #[ORM\Column(type: "integer", options: ['default' => 0])]
+    private int $karma = 0;
+
     #[ORM\OneToMany(mappedBy: "user", targetEntity: UserConsommable::class)]
     private $userConsommables;
 
@@ -706,6 +716,19 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     public function setHonneur(?int $honneur): self
     {
         $this->honneur = $honneur;
+
+        return $this;
+    }
+
+    public function getKarma(): int
+    {
+        return $this->karma;
+    }
+
+    /** Ne pas appeler directement : passer par KarmaService, qui borne et journalise. */
+    public function setKarma(int $karma): self
+    {
+        $this->karma = $karma;
 
         return $this;
     }

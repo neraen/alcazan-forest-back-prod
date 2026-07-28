@@ -21,9 +21,25 @@ class ShopObjet
     #[ORM\ManyToOne(targetEntity: Objet::class, inversedBy: 'shopObjets')]
     private $objet;
 
+    /** Prix de vente en boutique (or). null = prix de base de l'objet. */
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private $prix;
+
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getPrix(): ?int
+    {
+        return $this->prix;
+    }
+
+    public function setPrix(?int $prix): self
+    {
+        $this->prix = $prix;
+
+        return $this;
     }
 
     public function getShop(): ?Shop

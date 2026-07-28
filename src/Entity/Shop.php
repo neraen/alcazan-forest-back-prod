@@ -30,11 +30,15 @@ class Shop
     #[ORM\OneToMany(targetEntity: ShopEquipement::class, mappedBy: 'shop')]
     private $shopEquipements;
 
+    #[ORM\OneToMany(targetEntity: ShopConsommable::class, mappedBy: 'shop')]
+    private $shopConsommables;
+
     public function __construct()
     {
         $this->shopObjets = new ArrayCollection();
         $this->pnjs = new ArrayCollection();
         $this->shopEquipements = new ArrayCollection();
+        $this->shopConsommables = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -150,6 +154,35 @@ class Shop
             // set the owning side to null (unless already changed)
             if ($shopEquipement->getShop() === $this) {
                 $shopEquipement->setShop(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection|ShopConsommable[]
+     */
+    public function getShopConsommables(): Collection
+    {
+        return $this->shopConsommables;
+    }
+
+    public function addShopConsommable(ShopConsommable $shopConsommable): self
+    {
+        if (!$this->shopConsommables->contains($shopConsommable)) {
+            $this->shopConsommables[] = $shopConsommable;
+            $shopConsommable->setShop($this);
+        }
+
+        return $this;
+    }
+
+    public function removeShopConsommable(ShopConsommable $shopConsommable): self
+    {
+        if ($this->shopConsommables->removeElement($shopConsommable)) {
+            if ($shopConsommable->getShop() === $this) {
+                $shopConsommable->setShop(null);
             }
         }
 

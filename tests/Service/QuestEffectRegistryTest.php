@@ -8,15 +8,18 @@ use App\Entity\BossRecompense;
 use App\Entity\Classe;
 use App\Entity\Recompense;
 use App\Entity\User;
+use App\Entity\UserBoss;
 use App\Enum\QuestEffect;
 use App\Exception\QuestException;
 use App\Repository\AlignementRepository;
 use App\Repository\BossRecompenseRepository;
 use App\Repository\ClasseRepository;
+use App\Repository\UserBossRepository;
 use App\Repository\UserRepository;
 use App\service\AubergeService;
 use App\service\InventaireService;
 use App\service\QuestEffectRegistry;
+use App\service\RecompenseService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -31,6 +34,8 @@ class QuestEffectRegistryTest extends TestCase
     private UserRepository|MockObject $userRepository;
     private AlignementRepository|MockObject $alignementRepository;
     private BossRecompenseRepository|MockObject $bossRecompenseRepository;
+    private UserBossRepository|MockObject $userBossRepository;
+    private RecompenseService|MockObject $recompenseService;
     private InventaireService|MockObject $inventaireService;
     private AubergeService|MockObject $aubergeService;
     private QuestEffectRegistry $registry;
@@ -41,6 +46,8 @@ class QuestEffectRegistryTest extends TestCase
         $this->userRepository = $this->createMock(UserRepository::class);
         $this->alignementRepository = $this->createMock(AlignementRepository::class);
         $this->bossRecompenseRepository = $this->createMock(BossRecompenseRepository::class);
+        $this->userBossRepository = $this->createMock(UserBossRepository::class);
+        $this->recompenseService = $this->createMock(RecompenseService::class);
         $this->inventaireService = $this->createMock(InventaireService::class);
         $this->aubergeService = $this->createMock(AubergeService::class);
 
@@ -49,6 +56,12 @@ class QuestEffectRegistryTest extends TestCase
             $this->userRepository,
             $this->alignementRepository,
             $this->bossRecompenseRepository,
+            $this->userBossRepository,
+            $this->createMock(\App\Repository\CarteCarreauRepository::class),
+            $this->createMock(\App\service\DonjonInstanceService::class),
+            $this->createMock(\App\service\DonjonCombatService::class),
+            $this->createMock(\App\service\DonjonSalleService::class),
+            $this->recompenseService,
             $this->inventaireService,
             $this->aubergeService,
             $this->createMock(EntityManagerInterface::class)
@@ -117,19 +130,85 @@ class QuestEffectRegistryTest extends TestCase
         $this->registry->execute(QuestEffect::RECOMPENSE_BOSS, ['bossId' => 999], $this->makeUser(1));
     }
 
-    public function testRecompenseBossConstruitLesMessagesSansHtml(): void
+    public function testRecompenseBossDistribueLeButinEtMarqueLeRamassage(): void
     {
-        $recompense = new Recompense();
-        $recompense->setMoney(2500);
-        $recompense->setExperience(3200);
-        $bossRecompense = $this->createConfiguredMock(BossRecompense::class, ['getRecompense' => $recompense]);
-        $this->bossRecompenseRepository->method('findBy')->willReturn([$bossRecompense]);
+        $recompense = (new Recompense())->setMoney(2500)->setExperience(3200);
+        $this->donneUneTableDeButin($recompense);
+        $userBoss = $this->userBossKill(new \DateTime('now'));
+        $user = $this->makeUser(1);
+
+        $this->recompenseService->method('tirerDansTable')->willReturn($recompense);
+        $this->recompenseService->expects($this->once())->method('distribuer')->with($user, $recompense)
+            ->willReturn(['rewards' => [['type' => 'or', 'label' => "pièces d'or", 'quantity' => 2500]], 'playerXp' => null]);
+        $this->recompenseService->method('decrireRecompenses')->willReturn(["Vous obtenez 2500 pièces d'or."]);
+
+        $result = $this->registry->execute(QuestEffect::RECOMPENSE_BOSS, ['bossId' => 1], $user);
+
+        $this->assertSame(["Vous obtenez 2500 pièces d'or."], $result['messages']);
+        $this->assertStringNotContainsString('<', implode(' ', $result['messages']));
+        $this->assertNotNull($userBoss->getLastLoot(), "le ramassage doit être horodaté pour interdire un second passage");
+    }
+
+    public function testRecompenseBossRefuseSiLeBossNAJamaisEteTue(): void
+    {
+        $this->donneUneTableDeButin(new Recompense());
+        $this->userBossRepository->method('findOneBy')->willReturn(null);
+
+        $this->recompenseService->expects($this->never())->method('distribuer');
+
+        $this->expectException(QuestException::class);
+        $this->registry->execute(QuestEffect::RECOMPENSE_BOSS, ['bossId' => 1], $this->makeUser(1));
+    }
+
+    public function testRecompenseBossRefuseUnSecondRamassageSurLeMemeKill(): void
+    {
+        $this->donneUneTableDeButin(new Recompense());
+        $kill = new \DateTime('now');
+        $userBoss = $this->userBossKill($kill);
+        $userBoss->setLastLoot($kill);
+
+        $this->recompenseService->expects($this->never())->method('distribuer');
+
+        $this->expectException(QuestException::class);
+        $this->registry->execute(QuestEffect::RECOMPENSE_BOSS, ['bossId' => 1], $this->makeUser(1));
+    }
+
+    public function testRecompenseBossRefuseUnKillTropAncien(): void
+    {
+        $this->donneUneTableDeButin(new Recompense());
+        $this->userBossKill(new \DateTime('-' . (GameContent::FENETRE_SALLE_TRESOR_SECONDES + 60) . ' seconds'));
+
+        $this->recompenseService->expects($this->never())->method('distribuer');
+
+        $this->expectException(QuestException::class);
+        $this->registry->execute(QuestEffect::RECOMPENSE_BOSS, ['bossId' => 1], $this->makeUser(1));
+    }
+
+    public function testRecompenseBossAnnonceUnCoffreVideQuandLeTirageNeDonneRien(): void
+    {
+        $this->donneUneTableDeButin(new Recompense());
+        $this->userBossKill(new \DateTime('now'));
+        $this->recompenseService->method('tirerDansTable')->willReturn(null);
+
+        $this->recompenseService->expects($this->never())->method('distribuer');
 
         $result = $this->registry->execute(QuestEffect::RECOMPENSE_BOSS, ['bossId' => 1], $this->makeUser(1));
 
-        $this->assertSame("Vous gagnez 2500 pièces d'or.", $result['messages'][0]);
-        $this->assertSame("Vous gagnez 3200 points d'expérience.", $result['messages'][1]);
-        $this->assertStringNotContainsString('<', implode(' ', $result['messages']));
+        $this->assertStringContainsString('poussière', $result['messages'][0]);
+    }
+
+    private function donneUneTableDeButin(Recompense $recompense): void
+    {
+        $bossRecompense = $this->createConfiguredMock(BossRecompense::class, ['getRecompense' => $recompense]);
+        $this->bossRecompenseRepository->method('findBy')->willReturn([$bossRecompense]);
+    }
+
+    private function userBossKill(\DateTimeInterface $lastKill): UserBoss
+    {
+        $userBoss = (new UserBoss())->setLastKill($lastKill);
+        $this->userBossRepository->method('findOneBy')->willReturn($userBoss);
+
+        return $userBoss;
     }
 
     private function makeUser(int $id): User

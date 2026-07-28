@@ -5,7 +5,10 @@ namespace App\Entity;
 use App\Repository\InventaireEquipementRepository;
 use Doctrine\ORM\Mapping as ORM;
 
+// Une seule ligne de pile par couple sac/objet : garde-fou en base contre les doublons
+// d'inventaire (cf. EquipementEquipeService).
 #[ORM\Entity(repositoryClass: InventaireEquipementRepository::class)]
+#[ORM\UniqueConstraint(name: 'uniq_inventaire_equipement', columns: ['inventaire_id', 'equipement_id'])]
 class InventaireEquipement
 {
     #[ORM\Id]

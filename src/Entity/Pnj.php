@@ -45,11 +45,21 @@ class Pnj
     #[ORM\OneToMany(mappedBy: 'pnj', targetEntity: Action::class)]
     private $actions;
 
+    /**
+     * Métiers qu'un maître de métier (`type` = « metier ») enseigne. Relation N-N plutôt
+     * qu'un métier unique : un même maître peut ouvrir plusieurs voies, et un métier peut
+     * s'apprendre en plusieurs endroits du monde.
+     */
+    #[ORM\ManyToMany(targetEntity: Metier::class, inversedBy: 'maitres')]
+    #[ORM\JoinTable(name: 'pnj_metier')]
+    private Collection $metiers;
+
     public function __construct()
     {
         $this->sequences = new ArrayCollection();
         $this->carteCarreau = new ArrayCollection();
         $this->actions = new ArrayCollection();
+        $this->metiers = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -227,6 +237,30 @@ class Pnj
                 $action->setPnj(null);
             }
         }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Metier>
+     */
+    public function getMetiers(): Collection
+    {
+        return $this->metiers;
+    }
+
+    public function addMetier(Metier $metier): self
+    {
+        if (!$this->metiers->contains($metier)) {
+            $this->metiers[] = $metier;
+        }
+
+        return $this;
+    }
+
+    public function removeMetier(Metier $metier): self
+    {
+        $this->metiers->removeElement($metier);
 
         return $this;
     }
