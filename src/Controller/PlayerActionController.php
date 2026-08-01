@@ -2,19 +2,23 @@
 
 namespace App\Controller;
 
+use App\DTO\CauseMort;
 use App\Entity\Friend;
-use App\Entity\JoueurGuilde;
+use App\Enum\TypeCible;
+use App\Enum\TypeCumul;
+use App\Enum\TypeEvenement;
 use App\Enum\TypeItem;
 use App\Repository\BossRepository;
 use App\Repository\ConsommableRepository;
 use App\Repository\EquipementRepository;
 use App\Repository\FriendRepository;
-use App\Repository\GuildeRepository;
 use App\Repository\MonstreCarreauRepository;
 use App\Repository\SortilegeRepository;
 use App\Repository\UserRepository;
 use App\service\DeathService;
-use App\service\HistoriqueService;
+use App\service\CumulJoueurService;
+use App\service\JournalService;
+use App\service\PvpService;
 use App\service\SacService;
 use App\service\LevelingService;
 use App\service\SpellService;
@@ -23,6 +27,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\OptimisticLockException;
 use Doctrine\ORM\ORMException;
 use App\Exception\DonjonException;
+use App\Exception\PvpException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -36,76 +41,38 @@ class PlayerActionController extends AbstractController
 {
     public function __construct(){}
 
+    /**
+     * Duel entre joueurs. Contrôleur FIN : toutes les règles sont dans `PvpService`.
+     *
+     * L'ancienne version faisait soixante-dix lignes, construisait ses messages en HTML, et
+     * ne vérifiait NI les points d'action, NI la carte, NI la portée — attaquer un joueur
+     * était gratuit et possible à travers le monde.
+     */
     #[Route("/joueur/attack/joueur", name:"joueur_attack_joueur", methods: ["POST"])]
     public function attackPlayerVsPlayer(
-        Request                 $request,
-        UserRepository          $userRepository,
-        SortilegeRepository     $sortilegeRepository,
-        LevelingService         $levelingService,
-        HistoriqueService       $historiqueService,
-        SpellService            $spellService
+        Request             $request,
+        SortilegeRepository $sortilegeRepository,
+        PvpService          $pvpService
     ): Response {
         $data = json_decode($request->getContent(), true);
-        $spell = $sortilegeRepository->find($data['spellId']);
-        $arrayStat = [];
-        $user = $this->getUser();
+        $sort = $sortilegeRepository->find($data['spellId'] ?? 0);
+        $cibleId = (int) ($data['targetId'] ?? 0);
 
-        $target = $userRepository->find($data['targetId']);
-
-        $experience = 0;
-        $message = "";
-        $valueReturned = 0;
-        if($spell->getType() === "attack"){
-
-            $arrayStat['attack'] = $spellService->doDamage($target, $spell, $user);
-            $experience =  mt_rand(180, 240);
-            $message =  "Vous infligez {$arrayStat['attack']['damage']} points de dommages à {$target->getPseudo()} et vous gagnez $experience points d'expériences <br />";
-            $message .=  isset($arrayStat['attack']['kill']) && $arrayStat['attack']['kill'] ? "Le joueur {$target->getPseudo()} meurt, vous gagnez {$arrayStat['attack']['honor']} points d'honneur." : "";
-            $historiqueService->recordInHistoryPlayer($user, $message, false);
-            $messageForPlayerTargeted = "{$user->getPseudo()} vous attaque avec {$spell->getNom()} et vous inflige {$arrayStat['attack']['damage']} points de dommages";
-            $messageForPlayerTargeted .=  isset($arrayStat['attack']['kill']) && $arrayStat['attack']['kill'] ? "{$user->getPseudo()} vous a tué, vous perdez {$arrayStat['attack']['honorLoose']} points d'honneur." : "";
-            $historiqueService->recordInHistoryPlayer($target, $messageForPlayerTargeted, true);
-            $valueReturned = $arrayStat['attack']['damage'];
-
-        }else if($spell->getType() === "soin"){
-
-            $arrayStat['soin'] = $spellService->healPlayer($target, $spell, $user);
-            $experience =  mt_rand(190, 255);
-            $message =  "Vous soignez {$target->getPseudo()}, il récupère {$arrayStat['soin']['value']} points de vie et vous gagnez $experience points d'expériences <br />";
-            $historiqueService->recordInHistoryPlayer($user, $message, false);
-            $messageForPlayerTargeted = "{$user->getPseudo()} vous soigne et vous rend {$arrayStat['soin']['value']} points de vie";
-            $historiqueService->recordInHistoryPlayer($target, $messageForPlayerTargeted, true);
-            $valueReturned = $arrayStat['soin']['value'];
-
-        }else if($spell->getType() === "buff"){
-            $buffApplyed = $spellService->applyBuffEffect($target, $spell);
-            $valueReturned = 0;
-            $message = $buffApplyed
-                ? "Vous utilisez {$spell->getNom()} sur {$target->getPseudo()}"
-                : "{$target->getPseudo()} est déjà sous cet effet (ou a atteint la limite de 3 buffs)";
+        try {
+            // Le type du sort aiguille : `PvpService` refuse de toute façon un sort qui
+            // n'est pas de la bonne famille, mais l'aiguillage évite un aller-retour.
+            $resultat = match ($sort?->getType()) {
+                'soin' => $pvpService->soigner($this->getUser(), $cibleId, (int) $sort->getId()),
+                'attack' => $pvpService->attaquer($this->getUser(), $cibleId, (int) $sort->getId()),
+                default => throw new PvpException("Ce sortilège ne peut pas viser un joueur."),
+            };
+        } catch (PvpException $exception) {
+            // ⚠️ Un refus DOIT se voir : le front toaste ce message. Sans lui, un clic ne
+            // produirait rien de visible, ce qui se lit comme un bug de la carte.
+            return new JsonResponse(['message' => $exception->getMessage()], Response::HTTP_BAD_REQUEST);
         }
 
-
-        /* todo faire un calcul de l'attaque max potentielle pour l'experience */
-
-        $newExperience = $levelingService->giveExperienceToAPlayer($experience, $user->getId());
-
-
-        $json = json_encode([
-            'damage' => $valueReturned,
-            'experience' => $experience,
-            'newExperience' => $newExperience['experience'],
-            'lifeJoueur' => $arrayStat['lifeJoueur'] ?? $user->getCurrentLife(),
-            'damageReturns' => $arrayStat['damageReturns'] ?? 0,
-            'droppedItems' => $droppedItems ?? [],
-            'mapId' => $mapId ?? $user->getMap()->getId(),
-            'level' => $newExperience['level'],
-            'message' => $message,
-            'pa' => $user->getActionPoint(),
-            'needRefresh' => isset($arrayStat['attack']['kill'])
-        ]);
-
-        return new Response($json);
+        return new JsonResponse($resultat);
     }
 
 
@@ -116,7 +83,6 @@ class PlayerActionController extends AbstractController
         MonstreCarreauRepository    $monstreCarreauRepository,
         SpellService                $spellService,
         DeathService                $deathService,
-        HistoriqueService           $historiqueService,
         LevelingService             $levelingService
     ): Response {
         $data = json_decode($request->getContent(), true);
@@ -138,9 +104,7 @@ class PlayerActionController extends AbstractController
 
         $isDead = false;
         if((int)$arrayStat['lifeJoueur'] <= 0){
-            $statsAfterDeath = $deathService->diePlayer($user);
-            $message = "Le monstre {$target->getMonstre()->getName()} vous a infligé {$arrayStat['damage']} et vous a tué.";
-            $historiqueService->recordInHistoryPlayer($user, $message, true);
+            $statsAfterDeath = $deathService->diePlayer($user, CauseMort::monstre((int)$target->getMonstre()->getId()));
             $newExperience['experience'] = $statsAfterDeath['experience'];
             $mapId = $statsAfterDeath['mapId'];
             $isDead = true;
@@ -179,7 +143,6 @@ class PlayerActionController extends AbstractController
         BossRepository          $bossRepository,
         SpellService            $spellService,
         DeathService            $deathService,
-        HistoriqueService       $historiqueService,
         LevelingService         $levelingService
     ): Response {
         $data = json_decode($request->getContent(), true);
@@ -213,8 +176,6 @@ class PlayerActionController extends AbstractController
         // remise à son maximum par la mort.
         $isDead = (bool)($arrayStat['mortJoueur'] ?? false);
         if($isDead){
-            $message = "Le boss {$target->getName()} vous a infligé {$arrayStat['damage']} et vous a tué.";
-            $historiqueService->recordInHistoryPlayer($user, $message, true);
             $newExperience['experience'] = $arrayStat['apresMort']['experience'] ?? $newExperience['experience'];
             $mapId = $arrayStat['apresMort']['mapId'] ?? null;
         }
@@ -340,6 +301,8 @@ class PlayerActionController extends AbstractController
         \App\Repository\PnjRepository            $pnjRepository,
         \App\Repository\ShopEquipementRepository $shopEquipementRepository,
         SacService                      $sacService,
+        JournalService                  $journalService,
+        CumulJoueurService              $cumulJoueurService,
         EntityManagerInterface          $entityManager,
     ): Response {
         $data = json_decode($request->getContent(), true);
@@ -370,9 +333,35 @@ class PlayerActionController extends AbstractController
         try {
             // Débit + ajout au sac dans UNE transaction ; le débit contrôle l'or DISPONIBLE
             // (solde moins l'or réservé par un échange en cours).
-            $entityManager->wrapInTransaction(function () use ($sacService, $user, $equipementEntity, $price): void {
+            $entityManager->wrapInTransaction(function () use ($sacService, $journalService, $cumulJoueurService, $user, $equipementEntity, $price, $pnjId): void {
                 $sacService->debiterOr($user, $price);
                 $sacService->ajouterItem($user, TypeItem::EQUIPEMENT, $equipementEntity->getId(), 1);
+                $cumulJoueurService->ajouter($user, TypeCumul::OR_DEPENSE, $price);
+
+                // Consigné DANS la transaction : si le débit échoue, l'achat n'a pas eu lieu
+                // et le journal ne doit pas prétendre le contraire. C'est ce que garantit
+                // l'INSERT natif de JournalService, qui emprunte la même connexion.
+                //
+                // Exceptionnellement écrit depuis un contrôleur : l'achat en échoppe n'a pas
+                // de service (`ShopService` est une coquille vide et le vider ici serait un
+                // refactoring hors sujet). La vente, elle, passe bien par `VenteService`.
+                $journalService->consigner(
+                    type: TypeEvenement::ACHAT_PNJ,
+                    acteur: $user,
+                    cibleType: TypeCible::EQUIPEMENT,
+                    cibleId: (int) $equipementEntity->getId(),
+                    quantite: 1,
+                    montantOr: $price,
+                    contexte: [
+                        'pnjId' => $pnjId,
+                        'items' => [[
+                            'type' => TypeItem::EQUIPEMENT->value,
+                            'id' => (int) $equipementEntity->getId(),
+                            'quantite' => 1,
+                            'nom' => $equipementEntity->getNom(),
+                        ]],
+                    ],
+                );
             });
         } catch (\DomainException $exception) {
             return new JsonResponse([
@@ -448,34 +437,6 @@ class PlayerActionController extends AbstractController
     }
 
 
-    #[Route("/joueur/guilde/join", name:"joueur_guilde_join", methods: ["POST"])]
-    public function joueurGuildeJoin(
-        Request                 $request,
-        GuildeRepository        $guildeRepository,
-        EntityManagerInterface  $entityManager,
-    ): Response {
-        $data = json_decode($request->getContent(), true);
-        $guildeEntity = $guildeRepository->find($data['guildeId']);
-        $user = $this->getUser();
-
-        /**todo verifier le nombre de personnes dans la guilde **/
-        /**todo faire un système de notification pour le baron de la guilde*/
-
-        $joueurGuildeEntity = new JoueurGuilde();
-        $joueurGuildeEntity->setUser($user);
-        $joueurGuildeEntity->setGuilde($guildeEntity);
-        $joueurGuildeEntity->setGrade('recrue');
-
-        $entityManager->persist($joueurGuildeEntity);
-        $entityManager->flush();
-
-        $message = "Vous candidature à été envoyer au baron de la guilde {$guildeEntity->getNom()}";
-
-        return new JsonResponse([
-            'message' =>  $message,
-        ]);
-
-    }
 
 
     #[Route("/joueur/add/friend", name:"joueur_add_friend", methods: ["POST"])]

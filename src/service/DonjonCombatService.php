@@ -2,6 +2,8 @@
 
 namespace App\service;
 
+use App\DTO\CauseMort;
+
 use App\Entity\Boss;
 use App\Entity\DonjonInstance;
 use App\Entity\DonjonInstanceMembre;
@@ -210,7 +212,7 @@ class DonjonCombatService
         //    flush ci-dessus, car `diePlayer` écrit en DQL puis resynchronise l'entité :
         //    l'inverse ferait réécrire l'état d'avant la mort par ce flush.
         foreach ($tues as $joueur) {
-            $this->deathService->diePlayer($joueur);
+            $this->deathService->diePlayer($joueur, CauseMort::zoneDonjon((int)$instance->getId()));
             $messages[] = "{$joueur->getPseudo()} succombe et est renvoyé au cimetière.";
         }
 

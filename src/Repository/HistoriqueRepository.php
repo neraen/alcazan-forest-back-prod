@@ -20,28 +20,30 @@ class HistoriqueRepository extends ServiceEntityRepository
         parent::__construct($registry, Historique::class);
     }
 
-    public function insertHistoryForPlayer(int $userId, \DateTime $date, string $message){
-        return $this->createQueryBuilder('historique')
-            ->insert(Historique::class, 'historique')
-            ->values(
-                [
-                    'user' => '?',
-                    'date' => '?',
-                    'message' => '?',
-                ]
-            )
-            ->setParameter(0, $userId)
-            ->setParameter(1, $date)
-            ->setParameter(2, $message)
-            ->getQuery()
-            ->execute();
-    }
+    /**
+     * Le nombre de lignes rendues au joueur.
+     *
+     * L'ancien code n'en posait AUCUNE, et sans ordre : l'endpoint renvoyait tout
+     * l'historique du personnage dans l'ordre d'insertion, ce qui grossit sans fin.
+     */
+    private const LIGNES_MAX = 200;
 
-
+    /**
+     * Les dernières lignes d'historique d'un joueur, de la plus récente à la plus ancienne.
+     *
+     * Trois corrections par rapport à la version d'origine : le paramètre est LIÉ et non
+     * concaténé dans le DQL (l'identifiant venait du jeton, donc ce n'était pas exploitable,
+     * mais c'est le patron à ne surtout pas reprendre ailleurs), un `ORDER BY` explicite, et
+     * une limite.
+     */
     public function getAllRowsForPlayer(int $userId): array{
         return $this->createQueryBuilder('historique')
             ->select('historique.id', 'historique.message','historique.date', 'historique.isExternal')
-            ->where('historique.user = '.$userId)
+            ->where('historique.user = :userId')
+            ->setParameter('userId', $userId)
+            ->orderBy('historique.date', 'DESC')
+            ->addOrderBy('historique.id', 'DESC')
+            ->setMaxResults(self::LIGNES_MAX)
             ->getQuery()
             ->getResult(AbstractQuery::HYDRATE_ARRAY);
     }

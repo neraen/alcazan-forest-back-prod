@@ -9,6 +9,7 @@ use App\Enum\FamilleMetier;
 use App\Exception\MetierException;
 use App\Repository\JoueurMetierRepository;
 use App\Repository\MetierRepository;
+use App\Repository\ObjetRepository;
 use App\service\MetierService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -29,6 +30,7 @@ class MetierServiceTest extends TestCase
         $this->service = new MetierService(
             $this->joueurMetierRepository,
             $this->createMock(MetierRepository::class),
+            $this->createMock(ObjetRepository::class),
             $this->createMock(EntityManagerInterface::class)
         );
     }

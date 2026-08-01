@@ -12,7 +12,9 @@ use App\Entity\RecetteIngredient;
 use App\Entity\User;
 use App\Enum\ModeCraft;
 use App\Enum\StatutCraft;
+use App\Enum\TypeCible;
 use App\Enum\TypeCompteur;
+use App\Enum\TypeEvenement;
 use App\Enum\TypeItem;
 use App\Exception\CraftException;
 use App\Exception\MetierException;
@@ -58,6 +60,7 @@ class CraftService
         private readonly MetierService $metierService,
         private readonly KarmaService $karmaService,
         private readonly CompteurJoueurService $compteurJoueurService,
+        private readonly JournalService $journalService,
         private readonly EntityManagerInterface $entityManager
     ) {}
 
@@ -235,6 +238,17 @@ class CraftService
                 $user,
                 TypeCompteur::OBJET_FABRIQUE,
                 (int)$recette->getId()
+            );
+
+            // Journalisé au retrait pour la même raison que le compteur ci-dessus : c'est
+            // le moment où quelque chose sort réellement de l'atelier.
+            $this->journalService->consigner(
+                type: TypeEvenement::CRAFT_TERMINE,
+                acteur: $user,
+                cibleType: TypeCible::RECETTE,
+                cibleId: (int)$recette->getId(),
+                quantite: 1,
+                contexte: ['mode' => $commande->getMode()->value],
             );
 
             $commande->setStatut(StatutCraft::RETIREE);

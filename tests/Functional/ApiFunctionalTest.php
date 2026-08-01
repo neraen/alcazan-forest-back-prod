@@ -136,15 +136,23 @@ class ApiFunctionalTest extends WebTestCase
         $this->assertResponseStatusCodeSame(400);
     }
 
-    public function testGuildesPlayerIsEmptyWithoutAlignement(): void
+    /**
+     * L'annuaire est vide sans alignement, et il le DIT.
+     *
+     * Remplace l'ancien `/api/guildes/player`, supprimé avec la refonte des guildes : le
+     * message explique désormais pourquoi la liste est vide, au lieu de renvoyer un tableau
+     * vide qu'on pouvait confondre avec « aucune guilde n'existe ».
+     */
+    public function testAnnuaireEstVideSansAlignement(): void
     {
         $client = static::createClient();
         $user = $this->registerUser($client);
         $token = $this->login($client, $user);
 
-        $data = $this->jsonRequest($client, '/api/guildes/player', [], $token);
+        $data = $this->jsonRequest($client, '/api/guilde/annuaire', [], $token);
         $this->assertResponseIsSuccessful();
         $this->assertSame([], $data['guildes']);
+        $this->assertNotNull($data['message'], "Le joueur doit savoir qu'il lui manque un alignement.");
     }
 
     public function testPlayerCanMoveOnTheMap(): void

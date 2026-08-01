@@ -5,6 +5,7 @@ namespace App\service;
 use App\Entity\BossRecompense;
 use App\Entity\Recompense;
 use App\Entity\User;
+use App\Enum\TypeCumul;
 use App\Enum\TypeItem;
 
 /**
@@ -19,7 +20,8 @@ class RecompenseService
 {
     public function __construct(
         private readonly SacService $sacService,
-        private readonly LevelingService $levelingService
+        private readonly LevelingService $levelingService,
+        private readonly CumulJoueurService $cumulJoueurService
     ) {}
 
     /**
@@ -70,6 +72,13 @@ class RecompenseService
         if ($recompense->getMoney() !== null && $recompense->getMoney() > 0) {
             $or = $recompense->getMoney() * $multiplicateur;
             $this->sacService->crediterOr($user, $or);
+            // Compté ICI parce que ce service est l'unique point de conversion d'une
+            // récompense : quêtes, butin de boss, coffres et sortie d'atelier passent tous
+            // par lui. Sans cette ligne, `OR_GAGNE` ne compterait que les ventes et les
+            // échanges, et annoncerait donc un total faux à tout joueur qui a fait une quête.
+            // Pas de double comptage : la vente et l'hôtel des ventes créditent par
+            // `SacService` directement, jamais via une `Recompense`.
+            $this->cumulJoueurService->ajouter($user, TypeCumul::OR_GAGNE, $or);
             $rewards[] = ['type' => 'or', 'id' => null, 'label' => "pièces d'or", 'quantity' => $or];
         }
 

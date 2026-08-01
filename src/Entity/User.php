@@ -12,6 +12,12 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
+// Les deux classements assis sur un ÉTAT courant (et non sur un cumul) trient directement
+// `user` : sans index, chaque consultation ferait un tri de table complète. `hors_classement`
+// est en tête parce qu'il filtre avant de trier — c'est ce qui rend l'index utilisable pour
+// `WHERE hors_classement = 0 ORDER BY money DESC`.
+#[ORM\Index(name: 'idx_user_classement_richesse', columns: ['hors_classement', 'money'])]
+#[ORM\Index(name: 'idx_user_classement_honneur', columns: ['hors_classement', 'honneur'])]
 #[UniqueEntity(fields: ["email"], message: "Un utilisateur possède déjà cet email")]
 class User implements PasswordAuthenticatedUserInterface, UserInterface
 {
@@ -46,9 +52,6 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
 
     #[ORM\OneToOne(mappedBy: "user", targetEntity: NiveauJoueur::class)]
     private $niveauJoueur;
-
-    #[ORM\ManyToOne(targetEntity: Guilde::class, inversedBy: "users")]
-    private $guilde;
 
     #[ORM\ManyToOne(targetEntity: Alignement::class, inversedBy: "users")]
     private $alignement;
@@ -122,8 +125,13 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     #[ORM\Column(type: "datetime", nullable: true)]
     private $summoningSickness;
 
-    #[ORM\Column(type: "integer", nullable: true)]
-    private $honneur;
+    /**
+     * Conduite en duel. NOT NULL depuis le lot PvP : la colonne était nullable, et
+     * `$user->getHonneur() + $gain` opérait alors sur NULL sans prévenir.
+     * Muté UNIQUEMENT par HonneurService.
+     */
+    #[ORM\Column(type: "integer", options: ['default' => 0])]
+    private int $honneur = 0;
 
     /**
      * Karma écologique : la trace de la manière dont le joueur prend au monde.
@@ -135,6 +143,17 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     #[ORM\Column(type: "integer", options: ['default' => 0])]
     private int $karma = 0;
 
+    /**
+     * Exclut le compte des classements publics.
+     *
+     * Une COLONNE et non un test sur `roles` : filtrer avec `JSON_CONTAINS(roles, …)`
+     * détruirait l'index qui sert justement à trier le classement. Sans ce drapeau, le
+     * compte de développement — rempli de données de test — trusterait tous les podiums le
+     * jour du déploiement, et le classement cesserait d'être crédible dès le premier regard.
+     */
+    #[ORM\Column(name: "hors_classement", type: "boolean", options: ['default' => false])]
+    private bool $horsClassement = false;
+
     #[ORM\OneToMany(mappedBy: "user", targetEntity: UserConsommable::class)]
     private $userConsommables;
 
@@ -143,9 +162,6 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
 
     #[ORM\OneToMany(mappedBy: "user", targetEntity: JoueurGuilde::class)]
     private $joueurGuildes;
-
-    #[ORM\OneToMany(mappedBy: "user", targetEntity: JoueurGrade::class)]
-    private $joueurGrades;
 
     #[ORM\OneToMany(mappedBy: "expediteur", targetEntity: Message::class)]
     private $messages;
@@ -176,7 +192,6 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
         $this->joueurCaracteristiqueBonuses = new ArrayCollection();
         $this->userConsommables = new ArrayCollection();
         $this->joueurGuildes = new ArrayCollection();
-        $this->joueurGrades = new ArrayCollection();
         $this->messages = new ArrayCollection();
         $this->userBosses = new ArrayCollection();
         $this->historiques = new ArrayCollection();
@@ -344,16 +359,37 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
         return $this;
     }
 
-    public function getGuilde(): ?Guilde
+    /**
+     * La progression de niveau du joueur.
+     *
+     * La relation existait depuis l'origine sans accesseur : tout le code passait par
+     * `NiveauJoueurRepository`. Le getter évite une requête quand l'entité est déjà chargée
+     * (les listes de guilde la joignent explicitement).
+     */
+    public function getNiveauJoueur(): ?NiveauJoueur
     {
-        return $this->guilde;
+        return $this->niveauJoueur;
     }
 
-    public function setGuilde(?Guilde $guilde): self
+    /**
+     * La guilde dont le joueur est MEMBRE, ou null.
+     *
+     * Dérivée de `joueur_guilde` et non d'une colonne : `user.guilde_id` existait en
+     * parallèle sans qu'aucun code ne l'écrive, ce qui faisait que rejoindre une guilde
+     * n'avait aucun effet visible. Elle est supprimée ; ceci la remplace.
+     *
+     * Une candidature ne compte pas — on n'est pas « dans » une guilde tant qu'on n'y a pas
+     * été accepté.
+     */
+    public function guildeActuelle(): ?Guilde
     {
-        $this->guilde = $guilde;
+        foreach ($this->joueurGuildes as $appartenance) {
+            if ($appartenance->estMembre()) {
+                return $appartenance->getGuilde();
+            }
+        }
 
-        return $this;
+        return null;
     }
 
     public function getAlignement(): ?Alignement
@@ -713,9 +749,10 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
         return $this->honneur;
     }
 
+    /** Ne pas appeler directement : passer par HonneurService, qui borne. */
     public function setHonneur(?int $honneur): self
     {
-        $this->honneur = $honneur;
+        $this->honneur = (int) ($honneur ?? 0);
 
         return $this;
     }
@@ -729,6 +766,18 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     public function setKarma(int $karma): self
     {
         $this->karma = $karma;
+
+        return $this;
+    }
+
+    public function isHorsClassement(): bool
+    {
+        return $this->horsClassement;
+    }
+
+    public function setHorsClassement(bool $horsClassement): self
+    {
+        $this->horsClassement = $horsClassement;
 
         return $this;
     }
@@ -805,35 +854,6 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
         return $this;
     }
 
-    /**
-     * @return Collection|JoueurGrade[]
-     */
-    public function getJoueurGrades(): Collection
-    {
-        return $this->joueurGrades;
-    }
-
-    public function addJoueurGrade(JoueurGrade $joueurGrade): self
-    {
-        if (!$this->joueurGrades->contains($joueurGrade)) {
-            $this->joueurGrades[] = $joueurGrade;
-            $joueurGrade->setUser($this);
-        }
-
-        return $this;
-    }
-
-    public function removeJoueurGrade(JoueurGrade $joueurGrade): self
-    {
-        if ($this->joueurGrades->removeElement($joueurGrade)) {
-            // set the owning side to null (unless already changed)
-            if ($joueurGrade->getUser() === $this) {
-                $joueurGrade->setUser(null);
-            }
-        }
-
-        return $this;
-    }
 
     /**
      * @return Collection|Message[]

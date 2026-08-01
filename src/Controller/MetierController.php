@@ -28,11 +28,15 @@ class MetierController extends AbstractController
         private readonly EntityManagerInterface $entityManager
     ){}
 
-    /** Progression de métier du joueur (fiche de personnage). */
+    /**
+     * Progression de métier du joueur (fiche de personnage, page Artisanat), avec le
+     * catalogue de ressources des métiers de récolte : c'est ce que la page affiche quand
+     * on clique sur la fiche d'un bûcheron ou d'un herboriste.
+     */
     #[Route("/progression", name: "progression", methods: ["POST"])]
     public function progression(): Response
     {
-        return new JsonResponse($this->metierService->progressionDe($this->getUser()));
+        return new JsonResponse($this->metierService->progressionDe($this->getUser(), avecRessources: true));
     }
 
     #[Route("/apprendre", name: "apprendre", methods: ["POST"])]

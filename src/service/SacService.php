@@ -254,11 +254,19 @@ class SacService
     /* ---------------------------------------------------------------- lecture */
 
     /**
-     * Nom affichable, icône et prix de revente d'un modèle d'item — les trois familles nomment
-     * ces champs différemment (`nom`/`name`, `icone`/`image`, `prixRevente`/`prix_vente`).
+     * Fiche affichable d'un modèle d'item — les trois familles nomment leurs champs
+     * différemment (`nom`/`name`, `icone`/`image`, `prixRevente`/`prix_vente`) et deux d'entre
+     * elles n'ont ni position ni rareté. C'est le SEUL endroit qui connaît ces divergences :
+     * tout ce qui doit afficher un item par (type, id) passe par ici plutôt que de refaire un
+     * quatrième `match` sur les trois familles.
+     *
      * Contrat côté joueur : « pas de prix renseigné => 0 pièce d'or ».
      *
-     * @return array{nom: string, icone: ?string, prixRevente: int}
+     * `position` et `rarete` sont nuls hors équipement, et `icone` est le nom de fichier BRUT :
+     * les chemins d'images vivent côté front (`itemUtils.itemImage()`), jamais ici.
+     *
+     * @return array{nom: string, icone: ?string, prixRevente: int, description: ?string,
+     *               position: ?string, rarete: ?string}
      * @throws \DomainException item inconnu
      */
     public function decrireItem(TypeItem $type, int $itemId): array
@@ -273,18 +281,45 @@ class SacService
                 'nom' => (string) $item->getNom(),
                 'icone' => $item->getIcone(),
                 'prixRevente' => max(0, (int) $item->getPrixRevente()),
+                'description' => $item->getDescription(),
+                'position' => $item->getPositionEquipement()?->getName(),
+                'rarete' => $item->getRarity()?->getName(),
             ],
             TypeItem::CONSOMMABLE => [
                 'nom' => (string) $item->getNom(),
                 'icone' => $item->getIcone(),
                 'prixRevente' => max(0, (int) $item->getPrixRevente()),
+                'description' => $item->getDescription(),
+                'position' => null,
+                'rarete' => null,
             ],
             TypeItem::OBJET => [
                 'nom' => (string) $item->getName(),
                 'icone' => $item->getImage(),
                 'prixRevente' => max(0, (int) $item->getPrixVente()),
+                'description' => $item->getDescription(),
+                'position' => null,
+                'rarete' => null,
             ],
         };
+    }
+
+    /**
+     * Ids des modèles d'items dont le nom contient `$terme`, par famille.
+     *
+     * Ici pour la même raison que `decrireItem` : c'est le champ `nom` d'un côté et `name` de
+     * l'autre, et ce savoir-là ne doit exister qu'une fois. Une famille sans résultat rend un
+     * tableau vide, jamais une clé absente — l'appelant peut boucler sans tester.
+     *
+     * @return array<string, int[]> valeur de TypeItem => ids
+     */
+    public function rechercherItemsParNom(string $terme): array
+    {
+        return [
+            TypeItem::EQUIPEMENT->value => $this->equipementRepository->findIdsParNom($terme),
+            TypeItem::CONSOMMABLE->value => $this->consommableRepository->findIdsParNom($terme),
+            TypeItem::OBJET->value => $this->objetRepository->findIdsParNom($terme),
+        ];
     }
 
     public function trouverItem(TypeItem $type, int $itemId): Equipement|Consommable|Objet|null

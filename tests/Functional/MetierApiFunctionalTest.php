@@ -18,9 +18,13 @@ class MetierApiFunctionalTest extends WebTestCase
     private array $metiersCrees = [];
     private array $pnjsCrees = [];
     private array $casesPosees = [];
+    private array $objetsCrees = [];
 
     protected function tearDown(): void
     {
+        foreach ($this->objetsCrees as $objetId) {
+            $this->sql('DELETE FROM objet WHERE id = ?', [$objetId]);
+        }
         foreach ($this->casesPosees as $carteCarreauId) {
             $this->sql('UPDATE carte_carreau SET pnj_id = NULL WHERE id = ?', [$carteCarreauId]);
         }
@@ -164,6 +168,40 @@ class MetierApiFunctionalTest extends WebTestCase
         $this->assertNull($parId[$forgeron]['raison']);
     }
 
+    /**
+     * La fiche d'un métier de RÉCOLTE porte son catalogue de ressources, paliers hors de
+     * portée compris : c'est ce que la page Artisanat affiche quand on clique la carte.
+     * Masquer les paliers trop hauts priverait le joueur de la seule chose qu'il vient y
+     * lire — ce que son prochain niveau lui ouvrira.
+     */
+    public function testLaProgressionListeLesRessourcesDUnMetierDeRecolte(): void
+    {
+        $client = static::createClient();
+        [$user, $token] = $this->joueur();
+        $mineur = $this->creerMetier('Mineur', 'recolte');
+        $forgeron = $this->creerMetier('Forgeron', 'craft');
+        $this->creerRessource('Minerai de fer', $mineur, 1);
+        $this->creerRessource('Minerai d\'argent', $mineur, 20);
+        $this->jsonRequest($client, '/api/metier/apprendre', ['metierId' => $mineur], $token);
+        $this->jsonRequest($client, '/api/metier/apprendre', ['metierId' => $forgeron], $token);
+        $this->sql('UPDATE joueur_metier SET niveau = 5 WHERE user_id = ? AND metier_id = ?',
+            [$user['id'], $mineur]);
+
+        $reponse = $this->jsonRequest($client, '/api/metier/progression', [], $token);
+
+        $this->assertResponseIsSuccessful();
+        $parMetier = array_column($reponse['metiers'], null, 'metierId');
+        $ressources = array_column($parMetier[$mineur]['ressources'], null, 'niveauRequis');
+        $this->assertCount(2, $ressources, 'Les deux paliers sont renvoyés, pas seulement celui à portée');
+        $this->assertTrue($ressources[1]['accessible']);
+        $this->assertFalse($ressources[20]['accessible'], 'Niveau 5 ne récolte pas un palier 20');
+        // Nom de fichier BRUT : les dossiers d'images vivent côté front (itemUtils).
+        $this->assertSame('objet', $ressources[1]['type']);
+        $this->assertSame('minerai.png', $ressources[1]['image']);
+        $this->assertSame([], $parMetier[$forgeron]['ressources'],
+            'Un métier de fabrication ne récolte rien : ses recettes viennent de l\'atelier');
+    }
+
     public function testUnMetierInexistantEstRefuse(): void
     {
         $client = static::createClient();
@@ -192,6 +230,18 @@ class MetierApiFunctionalTest extends WebTestCase
             [$nom . uniqid(), $famille]);
         $id = (int)$this->sqlFetchOne('SELECT MAX(id) FROM metier');
         $this->metiersCrees[] = $id;
+
+        return $id;
+    }
+
+    /** Un objet classé ressource d'un métier (l'onglet Ressources de l'ArtisanatMaker). */
+    private function creerRessource(string $nom, int $metierId, int $niveau): int
+    {
+        $this->sql('INSERT INTO objet (name, description, prix_vente, image, metier_id, niveau_ressource)
+            VALUES (?, ?, 1, ?, ?, ?)',
+            [$nom . uniqid(), 'Ressource de test', 'minerai.png', $metierId, $niveau]);
+        $id = (int)$this->sqlFetchOne('SELECT MAX(id) FROM objet');
+        $this->objetsCrees[] = $id;
 
         return $id;
     }

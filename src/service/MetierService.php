@@ -5,12 +5,14 @@ namespace App\service;
 use App\Config\ArtisanatConfig;
 use App\Entity\JoueurMetier;
 use App\Entity\Metier;
+use App\Entity\Objet;
 use App\Entity\Pnj;
 use App\Entity\User;
 use App\Enum\FamilleMetier;
 use App\Exception\MetierException;
 use App\Repository\JoueurMetierRepository;
 use App\Repository\MetierRepository;
+use App\Repository\ObjetRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -48,6 +50,7 @@ class MetierService
     public function __construct(
         private readonly JoueurMetierRepository $joueurMetierRepository,
         private readonly MetierRepository $metierRepository,
+        private readonly ObjetRepository $objetRepository,
         private readonly EntityManagerInterface $entityManager
     ) {}
 
@@ -82,11 +85,20 @@ class MetierService
         return $places;
     }
 
-    /** Toute la progression du joueur, pour la fiche de personnage. */
-    public function progressionDe(User $user): array
+    /**
+     * Toute la progression du joueur, pour la fiche de personnage.
+     *
+     * `$avecRessources` ajoute, sur chaque métier de RÉCOLTE, le catalogue de ce qu'il
+     * permet de ramasser. C'est une option et non le défaut parce que `CraftService`
+     * n'appelle cette méthode que pour connaître les NIVEAUX du joueur : lui faire payer
+     * une requête par métier de récolte pour un catalogue qu'il ne renvoie pas serait
+     * du travail pur perdu.
+     */
+    public function progressionDe(User $user, bool $avecRessources = false): array
     {
         $metiers = array_map(
-            fn (JoueurMetier $ligne) => $this->decrireProgression($ligne),
+            fn (JoueurMetier $ligne) => $this->decrireProgression($ligne)
+                + ($avecRessources ? ['ressources' => $this->ressourcesDe($ligne)] : []),
             $this->joueurMetierRepository->findBy(['user' => $user])
         );
 
@@ -266,6 +278,47 @@ class MetierService
 
         return "Vous ne pouvez pas exercer plus de {$plafond} métiers {$quoi}. "
             . "Oubliez-en un pour en apprendre un autre.";
+    }
+
+    /**
+     * Ce qu'un métier de RÉCOLTE permet de ramasser : les objets classés ressources de ce
+     * métier (`objet.metier`, l'onglet Ressources de l'ArtisanatMaker), du premier palier
+     * au dernier.
+     *
+     * Les paliers HORS de portée sont renvoyés aussi, marqués `accessible: false` : une
+     * liste amputée ne dirait pas au joueur ce que son prochain niveau lui ouvrira, et
+     * c'est précisément ce qu'on vient lire sur la fiche d'un métier. Un métier de
+     * fabrication n'a rien à ramasser — ses recettes viennent de `CraftService::atelier()`.
+     *
+     * Purement informatif : la récolte reste arbitrée par `InteractionService`, qui
+     * revérifie métier et niveau sur la case.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function ressourcesDe(JoueurMetier $ligne): array
+    {
+        $metier = $ligne->getMetier();
+        if ($metier->getFamille() !== FamilleMetier::RECOLTE) {
+            return [];
+        }
+
+        $niveau = $ligne->getNiveau();
+        $ressources = $this->objetRepository->findBy(
+            ['metier' => $metier],
+            ['niveauRessource' => 'ASC', 'name' => 'ASC']
+        );
+
+        return array_map(fn (Objet $objet) => [
+            'id' => $objet->getId(),
+            'nom' => $objet->getName(),
+            'description' => $objet->getDescription(),
+            // Nom de fichier BRUT + type : les dossiers d'images vivent côté front
+            // (`itemUtils.itemImage`), jamais dans une réponse du serveur.
+            'type' => 'objet',
+            'image' => $objet->getImage(),
+            'niveauRequis' => $objet->getNiveauRessource(),
+            'accessible' => $niveau >= $objet->getNiveauRessource(),
+        ], $ressources);
     }
 
     private function decrireProgression(JoueurMetier $ligne): array

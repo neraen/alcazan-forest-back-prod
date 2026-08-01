@@ -19,6 +19,27 @@ class ObjetRepository extends ServiceEntityRepository
         parent::__construct($registry, Objet::class);
     }
 
+    /**
+     * Ids des objets dont le nom contient `$terme`.
+     *
+     * Sert la recherche de l'hôtel des ventes : `hotel_vente.item_id` n'a pas de clé
+     * étrangère, on ne peut donc pas joindre le nom en SQL. On résout d'abord le terme en
+     * ids ici — la table de contenu est petite — puis on filtre les annonces dessus.
+     *
+     * @return int[]
+     */
+    public function findIdsParNom(string $terme): array
+    {
+        $lignes = $this->createQueryBuilder('objet')
+            ->select('objet.id')
+            ->where('objet.name LIKE :terme')
+            ->setParameter('terme', '%' . $terme . '%')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_map('intval', array_column($lignes, 'id'));
+    }
+
     // /**
     //  * @return Objet[] Returns an array of Objet objects
     //  */

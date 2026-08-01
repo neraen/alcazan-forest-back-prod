@@ -20,6 +20,24 @@ class EquipementRepository extends ServiceEntityRepository
     }
 
     /**
+     * Ids des équipements dont le nom contient `$terme`. Voir ObjetRepository::findIdsParNom
+     * pour le pourquoi (recherche de l'hôtel des ventes, `item_id` sans clé étrangère).
+     *
+     * @return int[]
+     */
+    public function findIdsParNom(string $terme): array
+    {
+        $lignes = $this->createQueryBuilder('equipement')
+            ->select('equipement.id')
+            ->where('equipement.nom LIKE :terme')
+            ->setParameter('terme', '%' . $terme . '%')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_map('intval', array_column($lignes, 'id'));
+    }
+
+    /**
      * ⚠️ Ne PAS joindre `equipement.classe` ici : la relation est N-N, un équipement à deux
      * classes reviendrait en double dans ce résultat scalaire. Les classes se récupèrent à
      * part, via getClassesByEquipement().

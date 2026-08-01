@@ -19,6 +19,8 @@ use App\Repository\InventaireObjetRepository;
 use App\Repository\InventaireRepository;
 use App\Repository\ObjetRepository;
 use App\Repository\ReservationRessourceRepository;
+use App\service\CumulJoueurService;
+use App\service\JournalService;
 use App\service\SacService;
 use App\service\VenteService;
 use Doctrine\ORM\EntityManager;
@@ -78,7 +80,12 @@ class VenteServiceTest extends TestCase
             $this->reservationRessourceRepository
         );
 
-        $this->service = new VenteService($this->entityManager, $sacService);
+        $this->service = new VenteService(
+            $this->entityManager,
+            $sacService,
+            $this->createMock(JournalService::class),
+            $this->createMock(CumulJoueurService::class)
+        );
     }
 
     public function testVenteDUnEquipementCrediteSonPrixDeRevente(): void

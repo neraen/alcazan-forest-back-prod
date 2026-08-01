@@ -3,6 +3,9 @@
 namespace App\service;
 
 use App\Entity\User;
+use App\Enum\TypeCible;
+use App\Enum\TypeCumul;
+use App\Enum\TypeEvenement;
 use App\Enum\TypeItem;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -22,7 +25,9 @@ class VenteService
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly SacService             $sacService
+        private readonly SacService             $sacService,
+        private readonly JournalService         $journalService,
+        private readonly CumulJoueurService     $cumulJoueurService
     ) {}
 
     /**
@@ -48,6 +53,24 @@ class VenteService
             $prixUnitaire = $description['prixRevente'];
             $prix = $prixUnitaire * $quantite;
             $this->sacService->crediterOr($user, $prix);
+            $this->cumulJoueurService->ajouter($user, TypeCumul::OR_GAGNE, $prix);
+
+            // Le nom est celui lu à l'instant du fait : c'est ce qui rend la ligne encore
+            // lisible si l'objet disparaît du contenu plus tard.
+            $this->journalService->consigner(
+                type: TypeEvenement::VENTE_PNJ,
+                acteur: $user,
+                cibleType: TypeCible::depuisItem($type),
+                cibleId: $itemId,
+                quantite: $quantite,
+                montantOr: $prix,
+                contexte: ['items' => [[
+                    'type' => $type->value,
+                    'id' => $itemId,
+                    'quantite' => $quantite,
+                    'nom' => $description['nom'],
+                ]]],
+            );
 
             return [
                 'prix' => $prix,

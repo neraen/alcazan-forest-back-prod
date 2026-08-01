@@ -2,6 +2,7 @@
 
 namespace App\service;
 
+use App\DTO\CauseMort;
 use App\Entity\Boss;
 use App\Entity\Buff;
 use App\Entity\MonstreCarreau;
@@ -9,6 +10,9 @@ use App\Entity\Sortilege;
 use App\Entity\User;
 use App\Entity\UserBoss;
 use App\Entity\UserBuff;
+use App\Enum\TypeCible;
+use App\Enum\TypeCumul;
+use App\Enum\TypeEvenement;
 use App\Repository\BossRepository;
 use App\Repository\BossSortilegeRepository;
 use App\Repository\BuffCaracteristiqueRepository;
@@ -41,6 +45,8 @@ class SpellService
         private BuffCaracteristiqueRepository $buffCaracteristiqueRepository,
         private DonjonInstanceService $donjonInstanceService,
         private DonjonCombatService $donjonCombatService,
+        private JournalService $journalService,
+        private CumulJoueurService $cumulJoueurService,
         private EntityManagerInterface $entityManager
     ){
     }
@@ -56,15 +62,11 @@ class SpellService
 
         $life = $target->getCurrentLife() - $damageStat['damage'];
 
+        // CALCUL SEULEMENT : la mort, l'honneur et l'expérience appartiennent à PvpService.
+        // Tant qu'ils vivaient ici, ce service décidait de règles de duel au milieu d'une
+        // formule de dégâts — et c'est ce qui a laissé passer l'absence de décompte des PA.
         if($life <= 0){
-            $this->deathService->diePlayer($target);
-            $targetLevel = $this->niveauJoueurRepository->getPlayerLevel($target->getId());
-            $playerLevel = $this->niveauJoueurRepository->getPlayerLevel($user->getId());
-            $honnorGain = $this->computeHonnorGain($user, $targetLevel, $playerLevel);
-            $honnorLoose = $this->computeHonnorLoose($target, $targetLevel, $playerLevel);
             $damageStat['kill'] = true;
-            $damageStat['honor'] = $honnorGain;
-            $damageStat['honorLoose'] = $honnorLoose;
         }else{
             $this->userRepository->updateTargetLife($target, $life);
             if(!is_null($spell->getBuff())){
@@ -116,6 +118,26 @@ class SpellService
                 $this->entityManager->persist($userBossEntity);
                 $this->entityManager->flush();
             }
+
+            // Dénormalisation de SUM(user_boss.number_kill), incrémentée au même endroit qui
+            // vient d'écrire `user_boss` — celui-ci reste la source de vérité (ActionType::
+            // BATTRE_BOSS en dépend). Ce qui rend la copie légitime, c'est qu'elle est
+            // recalculable : `app:cumuls:reparer` la refait, et un test asserte l'égalité.
+            $this->cumulJoueurService->ajouter($user, TypeCumul::BOSS_VAINCUS);
+
+            // Consigné ici et pas dans le contrôleur : c'est ici que « le boss meurt » est
+            // vrai, même règle que `DeathService::dieMonster` pour les monstres. Le contexte
+            // distingue le plein air de l'instance, seule différence qui compte à l'enquête.
+            $this->journalService->consigner(
+                type: TypeEvenement::BOSS_VAINCU,
+                acteur: $user,
+                cibleType: TypeCible::BOSS,
+                cibleId: (int)$target->getId(),
+                quantite: 1,
+                contexte: $instance !== null
+                    ? ['instanceId' => $instance->getId()]
+                    : ['pleinAir' => true],
+            );
 
             if($instance !== null){
                 // L'instance passe TERMINEE : le groupe garde l'accès à la salle au
@@ -175,7 +197,7 @@ class SpellService
             // ça la victime restait en vie négative sur place, toujours ciblée.
             // `diePlayer` écrit en DQL — donc après le flush ci-dessus, jamais avant.
             $victimeMorte = $victime->getCurrentLife() <= 0;
-            $apresMort = $victimeMorte ? $this->deathService->diePlayer($victime) : null;
+            $apresMort = $victimeMorte ? $this->deathService->diePlayer($victime, CauseMort::boss((int)$target->getId())) : null;
 
             $combat = $this->donjonCombatService->jouerTick($instance, $target);
             $combat['cible'] = $victime->getPseudo();
@@ -195,7 +217,7 @@ class SpellService
         $this->entityManager->flush();
 
         $mortJoueur = $lifeJoueurAfterReturns <= 0;
-        $apresMort = $mortJoueur ? $this->deathService->diePlayer($user) : null;
+        $apresMort = $mortJoueur ? $this->deathService->diePlayer($user, CauseMort::boss((int)$target->getId())) : null;
 
         return ['life' => $life, 'lifeJoueur' => $user->getCurrentLife(), 'damage' => $damageStat['damage'],
                 'damageReturns' => $damageReturns, 'killMessage' => null, 'spell' => $bossSpell['name'],
@@ -203,51 +225,17 @@ class SpellService
                 'mortJoueur' => $mortJoueur, 'apresMort' => $apresMort];
     }
 
-    public function computeHonnorGain(User $user, int $targetLevel, int $playerLevel){
-        $difference = $playerLevel - $targetLevel;
-        $honnor = 0;
-        if($difference > 50){
-            $honnor = -5;
-        }else if ($difference < 30 && $difference > 18){
-            $honnor = floor((1/$difference) * 100);
-        }else if($difference < 18 && $difference > 9) {
-            $honnor = floor((1.5/$difference) * 100);
-        }else if($difference < 10 && $difference > -9){
-            $honnor = floor((35 - (18-($difference+9)) * 0.8));
-        }else if($difference < -9 && $difference > -30){
-            $honnor = 50 - 30 - $difference;
-        }else{
-            $honnor = 50;
-        }
-
-        $newHonnor = $user->getHonneur() + $honnor;
-        $this->userRepository->updatePlayerHonnor($user->getId(), $newHonnor);
-
-        return $honnor;
-    }
-
-    public function computeHonnorLoose(User $target, int $targetLevel, int $playerLevel){
-        $difference = $targetLevel - $playerLevel;
-        $honnor = 0;
-        if($difference > 50){
-            $honnor = -25;
-        }else if ($difference < 30 && $difference > 18){
-            $honnor = -20;
-        }else if($difference < 18 && $difference > 9) {
-            $honnor =-15;
-        }else if($difference < 10 && $difference > -9){
-            $honnor = -10;
-        }else if($difference < -9 && $difference > -30){
-            $honnor = -5;
-        }else{
-            $honnor = 0;
-        }
-
-        $newHonnor = $target->getHonneur() + $honnor;
-        $this->userRepository->updatePlayerHonnor($target->getId(), $newHonnor);
-
-        return $honnor;
-    }
+    /*
+     * `computeHonnorGain` et `computeHonnorLoose` ont été RETIRÉS d'ici (lot PvP).
+     *
+     * Ils écrivaient directement via `UserRepository::updatePlayerHonnor` — l'honneur était
+     * la seule valeur de progression du jeu sans point de mutation unique — et leur chaîne
+     * de six `if/else` avait des trous : une différence de niveaux entre 30 et 50, ou égale
+     * à 9, 18 ou 30, tombait dans le `else` final et rapportait le MAXIMUM pour avoir tué
+     * quelqu'un très en dessous de soi.
+     *
+     * Remplacés par `HonneurService` + la formule continue bornée de `PvpConfig`.
+     */
 
     public function healPlayer(User $target, Sortilege $spell, User $user){
         $caracteristiques = $this->getCaracsForSpell($user, $spell);

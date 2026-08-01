@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Repository\HistoriqueRepository;
+use App\service\HistoriqueService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,14 +15,16 @@ class HistoriqueController extends AbstractController{
     public function __construct(){}
 
 
+    /**
+     * Le journal du joueur : événements typés + lignes héritées, en une seule liste.
+     *
+     * La réponse porte désormais `categories` en plus de `rows` — l'écran n'en connaît
+     * aucune en dur, et « Mes actions / Subis » cesse d'être la seule classification
+     * honnête possible.
+     */
     #[Route("/historique/infos", name:"historique_infos", methods: ["POST"])]
-    public function getHistoriqueInfos(HistoriqueRepository $historiqueRepository): Response {
-        $user = $this->getUser();
-        $historiqueInfos = $historiqueRepository->getAllRowsForPlayer($user->getId());
-
-        return new JsonResponse([
-            'rows' => $historiqueInfos ?? []
-        ]);
+    public function getHistoriqueInfos(HistoriqueService $historiqueService): Response {
+        return new JsonResponse($historiqueService->pourJoueur($this->getUser()));
     }
 
 }

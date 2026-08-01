@@ -27,6 +27,8 @@ use App\Repository\SequenceRepository;
 use App\Repository\UserBossRepository;
 use App\Repository\UserQueteRepository;
 use App\service\CompteurJoueurService;
+use App\service\CumulJoueurService;
+use App\service\JournalService;
 use App\service\KarmaService;
 use App\service\LevelingService;
 use App\service\RecompenseService;
@@ -105,10 +107,11 @@ class QuestProgressionServiceTest extends TestCase
             $this->sacService,
             // RecompenseService réel (branché sur les mocks) : les assertions de ce
             // fichier portent sur les effets finaux en inventaire/or, pas sur la délégation.
-            new RecompenseService($this->sacService, $this->levelingService),
+            new RecompenseService($this->sacService, $this->levelingService, $this->createMock(CumulJoueurService::class)),
             $this->effectRegistry,
             new CompteurJoueurService($this->compteurRepository),
             new KarmaService($this->entityManager),
+            $this->createMock(JournalService::class),
             $this->entityManager
         );
     }

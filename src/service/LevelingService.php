@@ -4,11 +4,19 @@
 namespace App\service;
 
 
+use App\Enum\TypeCumul;
+use App\Enum\TypeEvenement;
 use App\Repository\NiveauJoueurRepository;
+use App\Repository\UserRepository;
 
 class LevelingService
 {
-    public function __construct(private NiveauJoueurRepository $niveauJoueurRepository){}
+    public function __construct(
+        private NiveauJoueurRepository $niveauJoueurRepository,
+        private UserRepository $userRepository,
+        private JournalService $journalService,
+        private CumulJoueurService $cumulJoueurService,
+    ){}
 
     // todo : faire une constante partagée (voir aussi addExperienceAndUpLevel)
     private const MAX_LEVEL = 200;
@@ -37,6 +45,17 @@ class LevelingService
             $this->niveauJoueurRepository->addExperience($userId, $newExperienceScore);
         }
 
+        // Le cumul est alimenté par identifiant, sans charger l'entité : voir
+        // `CumulJoueurService::ajouterParId`. Un pas ≤ 0 est ignoré par le service, ce qui
+        // suffirait — mais le test de signe est explicite ici parce que le cas n'a rien
+        // d'accidentel : `giveExpMalusAfterDeath` passe délibérément une valeur négative, et
+        // un malus de mort n'est pas de l'XP « dé-gagnée ».
+        if ($experience > 0) {
+            $this->cumulJoueurService->ajouterParId($userId, TypeCumul::XP_TOTALE, $experience);
+        }
+
+        $this->journaliser($userId, $experience, $level, $startLevel);
+
         return [
             'experience' => $newExperienceScore,
             'level' => $level,
@@ -51,5 +70,51 @@ class LevelingService
         $newExperienceData = $this->giveExperienceToAPlayer(-$experienceMaxLevel * 0.09, $userId);
 
         return $newExperienceData['experience'];
+    }
+
+    /**
+     * Consigne le gain d'XP et, le cas échéant, la montée de niveau.
+     *
+     * Trois précautions qui expliquent les conditions :
+     *
+     *  - **Un gain nul n'est pas un fait.** Plusieurs chemins appellent cette méthode avec 0
+     *    (sorts de buff notamment) ; « a gagné 0 point d'expérience » serait du bruit pur.
+     *  - **Un gain négatif n'est pas un gain.** Le malus de mort passe par ici avec une
+     *    valeur négative ; il est déjà raconté par l'événement `MORT_JOUEUR`, et le compter
+     *    comme de l'XP « dé-gagnée » fausserait aussi bien le journal que les futurs cumuls.
+     *  - **La montée de niveau est un fait distinct**, et rare : c'est ce qui la rend digne
+     *    de sa propre ligne là où l'XP, elle, est un flux.
+     *
+     * `find()` est un accès à l'identity map dans tous les appelants actuels — le joueur y
+     * est déjà chargé (`$this->getUser()` dans les contrôleurs, `$user` dans
+     * `RecompenseService`) — donc ce n'est pas un aller-retour base sur un chemin chaud.
+     */
+    private function journaliser(int $userId, int $experience, int $level, int $startLevel): void
+    {
+        if ($experience <= 0 && $level === $startLevel) {
+            return;
+        }
+
+        $user = $this->userRepository->find($userId);
+        if ($user === null) {
+            return;
+        }
+
+        if ($experience > 0) {
+            $this->journalService->consigner(
+                type: TypeEvenement::XP_GAGNEE,
+                acteur: $user,
+                quantite: $experience,
+            );
+        }
+
+        if ($level !== $startLevel) {
+            $this->journalService->consigner(
+                type: TypeEvenement::NIVEAU_ATTEINT,
+                acteur: $user,
+                quantite: $level,
+                contexte: ['niveauPrecedent' => $startLevel],
+            );
+        }
     }
 }

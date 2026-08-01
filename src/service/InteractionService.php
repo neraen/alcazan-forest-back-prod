@@ -10,8 +10,10 @@ use App\Entity\User;
 use App\Config\RecolteConfig;
 use App\Enum\ModeRecolte;
 use App\Enum\PorteeRecharge;
+use App\Enum\TypeCible;
 use App\Enum\TypeCompteur;
 use App\Enum\TypeConditionInteraction;
+use App\Enum\TypeEvenement;
 use App\Enum\TypeInteraction;
 use App\Enum\TypeItem;
 use App\Exception\InteractionException;
@@ -58,6 +60,7 @@ class InteractionService
         private readonly MetierService $metierService,
         private readonly KarmaService $karmaService,
         private readonly CompteurJoueurService $compteurJoueurService,
+        private readonly JournalService $journalService,
         private readonly SacService $sacService,
         private readonly QuestEffectRegistry $effectRegistry,
         private readonly DonjonInstanceService $donjonInstanceService,
@@ -367,7 +370,11 @@ class InteractionService
     }
 
     /**
-     * Compte les ressources ramassées, pour les actions de quête RECOLTER_RESSOURCE.
+     * Compte ET journalise les ressources ramassées.
+     *
+     * Le compteur sert les actions de quête RECOLTER_RESSOURCE ; le journal sert
+     * l'observation. Les deux se font dans la même passe et sous les mêmes conditions,
+     * précisément pour qu'ils ne puissent jamais diverger sur ce qui compte comme récolte.
      *
      * Restreint aux interactions de type RÉCOLTER : un coffre livre lui aussi des objets,
      * mais l'ouvrir n'est pas récolter, et une quête de cueilleur ne doit pas se valider
@@ -396,6 +403,15 @@ class InteractionService
                 TypeCompteur::RESSOURCE_RECOLTEE,
                 (int)$reward['id'],
                 (int)$reward['quantity']
+            );
+
+            $this->journalService->consigner(
+                type: TypeEvenement::RECOLTE,
+                acteur: $user,
+                cibleType: TypeCible::OBJET,
+                cibleId: (int)$reward['id'],
+                quantite: (int)$reward['quantity'],
+                contexte: ['interactionId' => $interaction->getId()],
             );
         }
     }

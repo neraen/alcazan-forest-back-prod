@@ -7,8 +7,12 @@ use App\Entity\DonjonInstanceMonstre;
 use App\Entity\Monstre;
 use App\Entity\MonstreCarreau;
 use App\Entity\MonstreObjet;
+use App\DTO\CauseMort;
 use App\Entity\User;
+use App\Enum\TypeCible;
 use App\Enum\TypeCompteur;
+use App\Enum\TypeCumul;
+use App\Enum\TypeEvenement;
 use App\Enum\TypeItem;
 use App\Repository\CarteCarreauRepository;
 use App\Repository\CarteRepository;
@@ -24,6 +28,8 @@ class DeathService
         private SacService $sacService,
         private MetierService $metierService,
         private CompteurJoueurService $compteurJoueurService,
+        private CumulJoueurService $cumulJoueurService,
+        private JournalService $journalService,
         private CarteRepository $carteRepository,
         private CarteCarreauRepository $carteCarreauRepository,
         private UserRepository $userRepository,
@@ -61,7 +67,21 @@ class DeathService
                 (int)$monstreCarreau->getMonstre()->getId()
             );
 
+            // Le compteur répond « combien de CE monstre », le cumul « combien en tout ».
+            // Les deux sont incrémentés au même endroit et sous les mêmes conditions, pour
+            // qu'ils ne puissent pas diverger sur ce qui compte comme mise à mort.
+            $this->cumulJoueurService->ajouter($user, TypeCumul::MONSTRES_TUES);
+
             $droppedItems = $this->distribuerButin($monstreCarreau->getMonstre(), $user);
+
+            $this->journalService->consigner(
+                type: TypeEvenement::MONSTRE_TUE,
+                acteur: $user,
+                cibleType: TypeCible::MONSTRE,
+                cibleId: (int)$monstreCarreau->getMonstre()->getId(),
+                quantite: 1,
+                contexte: $droppedItems === [] ? [] : ['butin' => $droppedItems],
+            );
 
             $this->entityManager->flush();
 
@@ -90,8 +110,25 @@ class DeathService
                 TypeCompteur::MONSTRE_TUE,
                 (int)$renfort->getMonstre()->getId()
             );
+            $this->cumulJoueurService->ajouter($user, TypeCumul::MONSTRES_TUES);
 
             $droppedItems = $this->distribuerButin($renfort->getMonstre(), $user);
+
+            // Même type d'événement qu'un monstre du monde ouvert : du point de vue du
+            // joueur c'est un monstre ordinaire, et le journal ne doit pas inventer une
+            // distinction que le jeu ne fait pas. Le contexte porte l'instance pour qui
+            // enquêterait sur une expédition précise.
+            $this->journalService->consigner(
+                type: TypeEvenement::MONSTRE_TUE,
+                acteur: $user,
+                cibleType: TypeCible::MONSTRE,
+                cibleId: (int)$renfort->getMonstre()->getId(),
+                quantite: 1,
+                contexte: array_filter([
+                    'butin' => $droppedItems === [] ? null : $droppedItems,
+                    'instanceId' => $renfort->getInstance()?->getId(),
+                ], static fn ($valeur) => $valeur !== null),
+            );
 
             $this->entityManager->flush();
 
@@ -151,7 +188,15 @@ class DeathService
             >= max(1, $drop->getNiveauMetierMin());
     }
 
-    public function diePlayer(User $user): array{
+    /**
+     * Mort d'un joueur : retour au cimetière le plus proche, malus d'XP, sortie d'instance.
+     *
+     * `$cause` est OPTIONNELLE : les appelants qui ne savent pas ce qui a tué compilent
+     * inchangés et journalisent « inconnue » plutôt qu'une cause inventée. Ceux qui savent
+     * (le PvP, le combat de monstre, le boss) la fournissent, et c'est elle qui attribue la
+     * mort — `acteur` = le tueur, `cible_user` = le mort.
+     */
+    public function diePlayer(User $user, ?CauseMort $cause = null): array{
         $initialMap = $this->carteRepository->find($user->getMap()->getId());
 
         // Mourir en donjon renvoie au cimetière, donc HORS de l'instance : le membre doit
@@ -184,6 +229,35 @@ class DeathService
 //        $this->entityManager->persist($userEntity);
 //        $this->entityManager->flush();
         $this->carteCarreauRepository->setPlayerOnCaseInAMap($nearestCimetiere->getId(), 11, 10, $user->getId());
+
+        // Consigné APRÈS les UPDATE en DQL et AVANT le refresh : un INSERT natif est
+        // indifférent au refresh, mais l'ordre rend l'intention lisible — on journalise une
+        // mort déjà écrite en base, jamais une mort qu'on s'apprête à écrire.
+        //
+        // `cause` reste « inconnue » tant que `diePlayer` ne sait pas QUI a tué : la
+        // signature ne porte pas le tueur, et l'ajouter est le travail du lot PvP, où elle
+        // gagnera un `?CauseMort` optionnel. Journaliser une cause fausse serait pire que
+        // de journaliser une cause absente.
+        //
+        // ⚠️ Contrairement à dieMonster/dieRenfort, cette méthode n'a PAS de transaction
+        // propre : le log part dans celle de l'appelant s'il y en a une, en autocommit sinon.
+        $this->journalService->consigner(
+            type: TypeEvenement::MORT_JOUEUR,
+            acteur: $cause?->tueur,
+            cibleUser: $user,
+            cibleType: $cause?->cibleType,
+            cibleId: $cause?->cibleId,
+            contexte: ($cause?->pourLeJournal() ?? ['cause' => 'inconnue'])
+                + ['mapId' => $initialMap?->getId()],
+        );
+
+        // `MORTS` compte les morts SUBIES, toutes causes confondues. `JOUEURS_TUES` n'est
+        // incrémenté que si la mort a un TUEUR : mourir sur une zone de donjon ne fait le
+        // score de personne.
+        $this->cumulJoueurService->ajouter($user, TypeCumul::MORTS);
+        if ($cause?->tueur !== null) {
+            $this->cumulJoueurService->ajouter($cause->tueur, TypeCumul::JOUEURS_TUES);
+        }
 
         // La mort est écrite par un UPDATE en DQL, qui NE PASSE PAS par l'unité de travail :
         // sans cette resynchronisation, l'entité en mémoire garde la vie négative et la

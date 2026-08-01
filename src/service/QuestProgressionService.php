@@ -9,7 +9,9 @@ use App\Entity\Sequence;
 use App\Entity\User;
 use App\Entity\UserQuete;
 use App\Enum\ActionType;
+use App\Enum\TypeCible;
 use App\Enum\TypeCompteur;
+use App\Enum\TypeEvenement;
 use App\Enum\TypeItem;
 use App\Exception\QuestException;
 use App\Exception\UnsupportedQuestActionException;
@@ -59,6 +61,7 @@ class QuestProgressionService
         private readonly QuestEffectRegistry $effectRegistry,
         private readonly CompteurJoueurService $compteurJoueurService,
         private readonly KarmaService $karmaService,
+        private readonly JournalService $journalService,
         private readonly EntityManagerInterface $entityManager
     ){}
 
@@ -246,6 +249,27 @@ class QuestProgressionService
             if ($nextSequence === null) {
                 $userQuete->setIsDone(true);
                 $this->entityManager->persist($userQuete);
+
+                // Journalisé ici, au seul endroit où `isDone` passe à vrai : une quête
+                // peut se terminer par épuisement des séquences OU par un choix qui coupe
+                // court (`endsQuest`), et les deux chemins convergent sur cette ligne.
+                // `montantOr` porte l'or de la récompense, et ce n'est pas décoratif : c'est
+                // de l'or CRÉÉ (il ne vient de la bourse de personne), donc l'une des deux
+                // sources que le tableau de bord oppose au puits des frais de dépôt. Sans
+                // lui, « or créé » ne compterait que les ventes aux marchands.
+                $orRecompense = array_sum(array_map(
+                    static fn (array $reward) => $reward['type'] === 'or' ? (int)$reward['quantity'] : 0,
+                    $rewards
+                ));
+
+                $this->journalService->consigner(
+                    type: TypeEvenement::QUETE_TERMINEE,
+                    acteur: $user,
+                    cibleType: TypeCible::QUETE,
+                    cibleId: (int)$quete->getId(),
+                    quantite: 1,
+                    montantOr: $orRecompense,
+                );
 
                 return $this->buildResponse(
                     'done',

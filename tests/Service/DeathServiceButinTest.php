@@ -10,8 +10,10 @@ use App\Entity\Objet;
 use App\Entity\User;
 use App\Enum\TypeItem;
 use App\service\CompteurJoueurService;
+use App\service\CumulJoueurService;
 use App\service\DeathService;
 use App\service\DonjonInstanceService;
+use App\service\JournalService;
 use App\service\LevelingService;
 use App\service\MapService;
 use App\service\MetierService;
@@ -53,6 +55,8 @@ class DeathServiceButinTest extends TestCase
             $this->sacService,
             $this->metierService,
             $this->createMock(CompteurJoueurService::class),
+            $this->createMock(CumulJoueurService::class),
+            $this->createMock(JournalService::class),
             $this->createMock(CarteRepository::class),
             $this->createMock(CarteCarreauRepository::class),
             $this->createMock(UserRepository::class),

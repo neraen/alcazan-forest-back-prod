@@ -45,6 +45,8 @@ class SpellServiceTest extends TestCase
             $this->createMock(BuffCaracteristiqueRepository::class),
             $this->createMock(\App\service\DonjonInstanceService::class),
             $this->createMock(\App\service\DonjonCombatService::class),
+            $this->createMock(\App\service\JournalService::class),
+            $this->createMock(\App\service\CumulJoueurService::class),
             $this->createMock(EntityManagerInterface::class)
         );
     }
@@ -110,35 +112,15 @@ class SpellServiceTest extends TestCase
         }
     }
 
-    /** Barème d'honneur : tuer beaucoup plus faible que soi est pénalisé. */
-    public function testHonnorGainIsNegativeWhenFarmingLowLevels(): void
-    {
-        $service = $this->makeService();
-        $user = $this->createConfiguredMock(User::class, ['getHonneur' => 100, 'getId' => 1]);
-
-        $honnor = $service->computeHonnorGain($user, 10, 90); // 80 niveaux d'écart
-        $this->assertSame(-5, $honnor);
-    }
-
-    public function testHonnorGainIsMaxWhenKillingMuchStronger(): void
-    {
-        $service = $this->makeService();
-        $user = $this->createConfiguredMock(User::class, ['getHonneur' => 0, 'getId' => 1]);
-
-        $honnor = $service->computeHonnorGain($user, 90, 10); // cible bien plus forte
-        $this->assertSame(50, $honnor);
-    }
-
-    public function testHonnorLooseNeverPositive(): void
-    {
-        $service = $this->makeService();
-        $target = $this->createConfiguredMock(User::class, ['getHonneur' => 100, 'getId' => 2]);
-
-        foreach ([[10, 90], [50, 40], [40, 50], [90, 10], [50, 50]] as [$targetLevel, $playerLevel]) {
-            $honnor = $service->computeHonnorLoose($target, $targetLevel, $playerLevel);
-            $this->assertLessThanOrEqual(0, $honnor, "targetLevel=$targetLevel playerLevel=$playerLevel");
-        }
-    }
+    /*
+     * Les trois tests de bareme d'honneur ont MIGRE vers `HonneurServiceTest` (lot PvP).
+     *
+     * Ils eprouvaient `computeHonnorGain`/`computeHonnorLoose`, qui vivaient ici et
+     * ecrivaient directement en base — l'honneur etait alors la seule valeur de progression
+     * sans point de mutation unique. Ils passaient tous les trois alors meme que la formule
+     * avait des trous (une difference de niveaux entre 30 et 50 rapportait le maximum) :
+     * ils testaient trois POINTS, pas l'intervalle. `HonneurServiceTest` le balaie en entier.
+     */
 
     /** Un buff ne peut être posé que s'il est absent ET que le joueur a < 3 buffs. */
     public function testPlayerCanBeBuffedWhenNotBuffedAndUnderLimit(): void

@@ -25,9 +25,6 @@ class Guilde
     #[ORM\Column(type: 'integer')]
     private $placeMax;
 
-    #[ORM\OneToMany(mappedBy: 'guilde', targetEntity: User::class)]
-    private $users;
-
     #[ORM\OneToMany(mappedBy: 'guilde', targetEntity: JoueurGuilde::class)]
     private $joueurGuildes;
 
@@ -45,7 +42,6 @@ class Guilde
 
     public function __construct()
     {
-        $this->users = new ArrayCollection();
         $this->joueurGuildes = new ArrayCollection();
     }
 
@@ -90,35 +86,6 @@ class Guilde
         return $this;
     }
 
-    /**
-     * @return Collection|User[]
-     */
-    public function getUsers(): Collection
-    {
-        return $this->users;
-    }
-
-    public function addUser(User $user): self
-    {
-        if (!$this->users->contains($user)) {
-            $this->users[] = $user;
-            $user->setGuilde($this);
-        }
-
-        return $this;
-    }
-
-    public function removeUser(User $user): self
-    {
-        if ($this->users->removeElement($user)) {
-            // set the owning side to null (unless already changed)
-            if ($user->getGuilde() === $this) {
-                $user->setGuilde(null);
-            }
-        }
-
-        return $this;
-    }
 
     /**
      * @return Collection|JoueurGuilde[]

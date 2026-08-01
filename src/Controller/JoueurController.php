@@ -23,7 +23,9 @@ use App\Repository\UserConsommableRepository;
 use App\Repository\UserRepository;
 use App\Repository\UserSortilegeRepository;
 use App\Repository\WrapRepository;
+use App\Enum\TypeCumul;
 use App\Exception\DonjonException;
+use App\service\CumulJoueurService;
 use App\service\DonjonInstanceService;
 use App\service\DonjonMapView;
 use App\service\DonjonSalleService;
@@ -44,6 +46,51 @@ class JoueurController extends AbstractController
 {
 
     public function __construct(){}
+
+
+    /**
+     * Les « faits d'armes » du joueur : ses totaux de partie et ses états de progression.
+     *
+     * Endpoint DÉDIÉ, et non un enrichissement de `/joueur/data/minimal` : ce dernier est le
+     * chemin CHAUD, rappelé à chaque rafraîchissement de carte, donc à chaque déplacement.
+     * Y ajouter sept agrégats taxerait tout le jeu pour un écran qu'on ouvre ponctuellement.
+     *
+     * Deux listes parce que ce sont deux natures différentes, et c'est exactement la
+     * distinction que porte `TypeCumul` : les faits d'armes sont des TOTAUX qui ne
+     * redescendent jamais (`joueur_cumul`), les états sont la photo de l'instant
+     * (`user.money`, `user.honneur`) — les recopier en cumul créerait une seconde vérité sur
+     * l'or. Le front les rend de la même façon ; c'est le serveur qui sait pourquoi elles
+     * diffèrent.
+     *
+     * Aucun libellé n'est en dur côté client : `label`, `unite` et `format` descendent d'ici.
+     */
+    #[Route("/joueur/stats", name:"joueur_stats", methods: ["POST"])]
+    public function stats(CumulJoueurService $cumulJoueurService): Response
+    {
+        $user = $this->getUser();
+
+        return new JsonResponse([
+            'faitsDArmes' => $cumulJoueurService->decrire($user, TypeCumul::faitsDArmes()),
+            'etats' => [
+                [
+                    'cle' => 'richesse',
+                    'label' => 'Richesse',
+                    'unite' => "pièce(s) d'or",
+                    'format' => 'or',
+                    'valeur' => (int) $user->getMoney(),
+                ],
+                [
+                    'cle' => 'honneur',
+                    'label' => 'Honneur PvP',
+                    'unite' => "point(s) d'honneur",
+                    'format' => 'entier',
+                    // `honneur` est NULLABLE en base et le restera jusqu'au lot PvP, qui lui
+                    // donnera un service de mutation unique et un défaut à 0.
+                    'valeur' => (int) ($user->getHonneur() ?? 0),
+                ],
+            ],
+        ]);
+    }
 
 
     #[Route("/joueur/disable/tutorial", name:"joueur_disable_tutorial", methods: ["POST"])]

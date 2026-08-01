@@ -19,6 +19,24 @@ class ConsommableRepository extends ServiceEntityRepository
         parent::__construct($registry, Consommable::class);
     }
 
+    /**
+     * Ids des consommables dont le nom contient `$terme`. Voir ObjetRepository::findIdsParNom
+     * pour le pourquoi (recherche de l'hôtel des ventes, `item_id` sans clé étrangère).
+     *
+     * @return int[]
+     */
+    public function findIdsParNom(string $terme): array
+    {
+        $lignes = $this->createQueryBuilder('consommable')
+            ->select('consommable.id')
+            ->where('consommable.nom LIKE :terme')
+            ->setParameter('terme', '%' . $terme . '%')
+            ->getQuery()
+            ->getScalarResult();
+
+        return array_map('intval', array_column($lignes, 'id'));
+    }
+
     // /**
     //  * @return Consommable[] Returns an array of Consommable objects
     //  */

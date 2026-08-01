@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\DTO\CauseMort;
 use App\DTO\Donjon\GroupeDTO;
 use App\DTO\Donjon\PorteDTO;
 use App\DTO\Donjon\RenfortDTO;
@@ -195,7 +196,7 @@ class DonjonController extends AbstractController
             $mapId = $user->getMap()?->getId();
             $estMort = false;
             if ($user->getCurrentLife() <= 0) {
-                $statsAfterDeath = $deathService->diePlayer($user);
+                $statsAfterDeath = $deathService->diePlayer($user, CauseMort::monstre((int)$renfort->getMonstre()->getId()));
                 $newExperience['experience'] = $statsAfterDeath['experience'];
                 $mapId = $statsAfterDeath['mapId'];
                 $estMort = true;

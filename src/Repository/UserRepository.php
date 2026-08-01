@@ -38,7 +38,8 @@ class UserRepository extends ServiceEntityRepository //implements PasswordUpgrad
             ->leftJoin('user.alignement', 'alignement')
             ->leftJoin('user.classe', 'classe')
             ->leftJoin('user.map', 'carte')
-            ->leftJoin('user.guilde', 'guilde')
+            ->leftJoin('user.joueurGuildes', 'appartenance', 'WITH', "appartenance.statut = 'membre'")
+            ->leftJoin('appartenance.guilde', 'guilde')
             ->where('user.id = '.$userId)
             ->getQuery()
             ->getSingleResult();
@@ -123,6 +124,95 @@ class UserRepository extends ServiceEntityRepository //implements PasswordUpgrad
             ->execute();
     }
 
+    /**
+     * Le haut du classement pour un ÉTAT courant du joueur (`money`, `honneur`).
+     *
+     * ⚠️ `$colonne` est interpolée dans la requête : elle ne doit JAMAIS venir d'une entrée
+     * client. Le seul appelant est `ClassementService`, qui l'obtient de
+     * `CategorieClassement::colonneUser()` — un ensemble de valeurs clos par l'enum. La
+     * garde ci-dessous rend l'invariant exécutable plutôt que documentaire.
+     *
+     * `COALESCE` parce que `user.honneur` est NULLABLE jusqu'au lot PvP : sans lui, les
+     * comptes jamais engagés en duel sortiraient du classement au lieu d'y figurer à zéro.
+     *
+     * @return list<array{userId: int, pseudo: string, niveau: ?int, classe: ?string, valeur: int}>
+     */
+    public function topParEtat(string $colonne, int $limite): array
+    {
+        if (!in_array($colonne, ['money', 'honneur'], true)) {
+            throw new \InvalidArgumentException("Colonne de classement non autorisée : $colonne");
+        }
+
+        $lignes = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            sprintf(
+                'SELECT u.id AS userId, u.pseudo, n.niveau, c.nom AS classe, COALESCE(u.%1$s, 0) AS valeur
+                 FROM user u
+                 LEFT JOIN niveau_joueur nj ON nj.user_id = u.id
+                 LEFT JOIN niveau n ON n.id = nj.niveau_id
+                 LEFT JOIN classe c ON c.id = u.classe_id
+                 WHERE u.hors_classement = 0
+                 ORDER BY valeur DESC, u.pseudo ASC
+                 LIMIT %2$d',
+                $colonne,
+                max(1, $limite)
+            )
+        );
+
+        return array_map(JoueurCumulRepository::ligneClassement(...), $lignes);
+    }
+
+    /**
+     * Rang d'un joueur pour un état courant. Mêmes règles d'ex æquo que pour les cumuls.
+     *
+     * @return array{rang: int, valeur: int}
+     */
+    public function rangParEtat(int $userId, string $colonne): array
+    {
+        if (!in_array($colonne, ['money', 'honneur'], true)) {
+            throw new \InvalidArgumentException("Colonne de classement non autorisée : $colonne");
+        }
+
+        $connection = $this->getEntityManager()->getConnection();
+
+        $valeur = (int) $connection->fetchOne(
+            sprintf('SELECT COALESCE(%s, 0) FROM user WHERE id = :id', $colonne),
+            ['id' => $userId]
+        );
+
+        $auDessus = (int) $connection->fetchOne(
+            sprintf(
+                'SELECT COUNT(*) FROM user WHERE hors_classement = 0 AND COALESCE(%s, 0) > :valeur',
+                $colonne
+            ),
+            ['valeur' => $valeur]
+        );
+
+        return ['rang' => $auDessus + 1, 'valeur' => $valeur];
+    }
+
+    /**
+     * Tous les comptes, pour le rail de l'écran d'administration.
+     *
+     * Pas de pagination : la population du jeu tient dans une liste, et l'écran filtre côté
+     * client. À revoir le jour où elle ne tiendra plus — ce sera un signe encourageant.
+     *
+     * @return list<array{id: int, pseudo: string, niveau: ?int, classe: ?string,
+     *                    money: int, lastConnexion: ?string, horsClassement: bool}>
+     */
+    public function listerPourAdministration(): array
+    {
+        return $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            'SELECT u.id, u.pseudo, u.money, u.hors_classement AS horsClassement,
+                    DATE_FORMAT(u.last_connexion, \'%Y-%m-%d %H:%i\') AS lastConnexion,
+                    n.niveau, c.nom AS classe
+             FROM user u
+             LEFT JOIN niveau_joueur nj ON nj.user_id = u.id
+             LEFT JOIN niveau n ON n.id = nj.niveau_id
+             LEFT JOIN classe c ON c.id = u.classe_id
+             ORDER BY u.pseudo ASC'
+        );
+    }
+
     public function getDataForProfil(string $pseudo){
         return $this->createQueryBuilder('user')
             ->select('user.pseudo',
@@ -136,9 +226,15 @@ class UserRepository extends ServiceEntityRepository //implements PasswordUpgrad
             ->leftJoin('user.niveauJoueur', 'niveauJoueur')
             ->leftJoin('niveauJoueur.niveau', 'level')
             ->leftJoin('user.alignement', 'alignement')
-            ->leftJoin('user.guilde', 'guilde')
+            ->leftJoin('user.joueurGuildes', 'appartenance', 'WITH', "appartenance.statut = 'membre'")
+            ->leftJoin('appartenance.guilde', 'guilde')
             ->leftJoin('user.classe', 'classe')
-            ->where("user.pseudo = '$pseudo'")
+            // Paramètre LIÉ : `$pseudo` vient du corps de la requête cliente
+            // (`POST /joueur/data/profil`), donc d'une entrée non maîtrisée. La concaténation
+            // précédente laissait injecter du DQL — même patron que le bug déjà corrigé dans
+            // `HistoriqueRepository::getAllRowsForPlayer`.
+            ->where('user.pseudo = :pseudo')
+            ->setParameter('pseudo', $pseudo)
             ->getQuery()
             ->getSingleResult(AbstractQuery::HYDRATE_ARRAY);
     }
