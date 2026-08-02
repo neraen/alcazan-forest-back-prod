@@ -6,7 +6,6 @@ use App\Config\PvpConfig;
 use App\DTO\CauseMort;
 use App\Entity\Sortilege;
 use App\Entity\User;
-use App\Enum\TypeEvenement;
 use App\Exception\PvpException;
 use App\Repository\NiveauJoueurRepository;
 use App\Repository\SortilegeRepository;
@@ -53,6 +52,10 @@ class PvpService
         private readonly UserRepository $userRepository,
         private readonly SortilegeRepository $sortilegeRepository,
         private readonly NiveauJoueurRepository $niveauJoueurRepository,
+        // Ajouté EN FIN de liste, jamais au milieu : les tests montent ce service avec des
+        // mocks positionnels, et une insertion intermédiaire les casse tous avec un
+        // `TypeError` portant sur un argument sans rapport (CLAUDE.md).
+        private readonly KarmaService $karmaService,
     ) {}
 
     /**
@@ -78,7 +81,10 @@ class PvpService
             $niveauAttaquant = (int) $this->niveauJoueurRepository->getPlayerLevel($attaquant->getId());
             $niveauCible = (int) $this->niveauJoueurRepository->getPlayerLevel($cible->getId());
 
+            $feuAmi = self::sontDuMemeCamp($attaquant, $cible);
+
             $honneur = null;
+            $prixTrahison = null;
             $experience = 0;
             $messages = [sprintf(
                 'Vous infligez %d points de dommages à %s.',
@@ -86,7 +92,7 @@ class PvpService
                 $cible->getPseudo()
             )];
 
-            if ($tue) {
+            if ($tue && !$feuAmi) {
                 // L'anti-farm est MESURÉ AVANT la mort : une fois `MORT_JOUEUR` consignée,
                 // le kill courant compterait comme un kill « récent » et s'auto-annulerait
                 // dès la première victoire. Mais il est APPLIQUÉ après, parce que
@@ -120,11 +126,23 @@ class PvpService
                         $honneur['vainqueur']['delta'],
                         $experience
                     );
+            } elseif ($tue) {
+                $this->deathService->diePlayer($cible, CauseMort::pvp($attaquant, feuAmi: true));
+                $messages[] = sprintf('%s tombe sous vos coups. Ce n\'était pas un ennemi.', $cible->getPseudo());
             }
 
+            if ($feuAmi) {
+                $prixTrahison = $this->facturerLeFeuAmi($attaquant, $cible, $tue);
+                $messages[] = $prixTrahison['message'];
+            }
+
+            // ⚠️ JAMAIS `null` quand il n'y a pas de gain : `UsernameBlock` s'affiche sous
+            // condition de `joueurState.level`, et un `level: null` remplace la fiche du
+            // joueur par un chargement perpétuel jusqu'au F5. « Aucune XP gagnée » n'est
+            // pas « aucun niveau » — on renvoie l'état courant.
             $niveau = $experience > 0
                 ? $this->levelingService->giveExperienceToAPlayer($experience, $attaquant->getId())
-                : null;
+                : $this->levelingService->etatDe($attaquant->getId());
 
             $this->entityManager->flush();
 
@@ -155,6 +173,7 @@ class PvpService
                 'kill' => $tue,
                 'niveau' => $niveau,
                 'honneur' => $honneur,
+                'feuAmi' => $prixTrahison,
                 'lifeCible' => $cible->getCurrentLife(),
             ];
         });
@@ -184,9 +203,11 @@ class PvpService
 
             $surAutrui = $cible->getId() !== $soigneur->getId();
             $experience = $surAutrui ? PvpConfig::XP_SOIN : 0;
+            // Même raison que dans `attaquer()` : se soigner soi-même ne rapporte rien, mais
+            // renvoyer `level: null` éteindrait la fiche du joueur.
             $niveau = $experience > 0
                 ? $this->levelingService->giveExperienceToAPlayer($experience, $soigneur->getId())
-                : null;
+                : $this->levelingService->etatDe($soigneur->getId());
 
             $this->entityManager->flush();
 
@@ -239,12 +260,11 @@ class PvpService
             throw new PvpException("Vous venez de réapparaître : attendez avant d'attaquer.");
         }
 
-        if (!PvpConfig::FEU_AMI_AUTORISE) {
-            $mien = $attaquant->getAlignement()?->getId();
-            $sien = $cible->getAlignement()?->getId();
-            if ($mien !== null && $mien === $sien) {
-                throw new PvpException("{$cible->getPseudo()} est de votre camp.");
-            }
+        // Le feu ami n'est PAS un refus : frapper un allié est permis, et se paie
+        // (`facturerLeFeuAmi`). La garde reste pilotée par la config pour qu'un futur
+        // arbitrage puisse le réinterdire sans rouvrir ce fichier.
+        if (!PvpConfig::FEU_AMI_AUTORISE && self::sontDuMemeCamp($attaquant, $cible)) {
+            throw new PvpException("{$cible->getPseudo()} est de votre camp.");
         }
 
         $this->verifierPortee($attaquant, $cible, $sort);
@@ -254,6 +274,59 @@ class PvpService
     /* ------------------------------------------------------------------ */
     /* Interne                                                             */
     /* ------------------------------------------------------------------ */
+
+    /**
+     * Deux joueurs du même camp — donc deux alliés.
+     *
+     * Un alignement NULL n'allie personne : le sans-camp n'a pas de camarades, il ne doit
+     * donc ni être protégé ni payer de trahison. Sans ce test, tous les joueurs qui n'ont
+     * pas choisi d'alignement seraient alliés entre eux par accident.
+     */
+    private static function sontDuMemeCamp(User $un, User $autre): bool
+    {
+        $mien = $un->getAlignement()?->getId();
+
+        return $mien !== null && $mien === $autre->getAlignement()?->getId();
+    }
+
+    /**
+     * Le prix d'un coup porté à un allié : honneur ET karma, sur l'ATTAQUANT seul.
+     *
+     * Les deux valeurs ne mesurent pas la même chose et c'est pour ça qu'elles tombent
+     * ensemble — l'honneur est la conduite en duel, le karma le rapport au monde. Trahir
+     * salit les deux.
+     *
+     * **La victime ne perd rien**, contrairement à une défaite en duel : se faire poignarder
+     * par son camp n'est pas un échec au combat. C'est aussi ce qui empêche la trahison de
+     * devenir une arme — sinon deux comptes complices se feraient tomber mutuellement
+     * l'honneur d'un rival… qui n'aurait rien fait.
+     *
+     * Une mise à mort ne rapporte NI honneur NI expérience : `attaquer()` court-circuite
+     * `appliquerVictoire`. Il n'y a pas de victoire à célébrer.
+     */
+    private function facturerLeFeuAmi(User $attaquant, User $cible, bool $tue): array
+    {
+        $honneur = $this->honneurService->ajuster(
+            $attaquant,
+            PvpConfig::FEU_AMI_HONNEUR_PAR_COUP + ($tue ? PvpConfig::FEU_AMI_HONNEUR_MISE_A_MORT : 0)
+        );
+        $karma = $this->karmaService->ajuster(
+            $attaquant,
+            PvpConfig::FEU_AMI_KARMA_PAR_COUP + ($tue ? PvpConfig::FEU_AMI_KARMA_MISE_A_MORT : 0)
+        );
+
+        return [
+            'honneur' => $honneur,
+            'karma' => $karma,
+            'miseAMort' => $tue,
+            'message' => sprintf(
+                '%s est de votre camp : honneur %+d, karma %+d.',
+                $cible->getPseudo(),
+                $honneur['delta'],
+                $karma['delta']
+            ),
+        ];
+    }
 
     /** @throws PvpException */
     private function verifierPortee(User $lanceur, User $cible, Sortilege $sort): void

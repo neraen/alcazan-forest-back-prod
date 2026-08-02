@@ -86,6 +86,35 @@ class PvpApiFunctionalTest extends WebTestCase
             $reponse['droppedItems'],
             "Un duel ne rapporte pas de butin, mais la clé doit exister : le front y accède par index."
         );
+
+        // ⚠️ Présentes ne suffit pas : elles doivent être RENSEIGNÉES. `UsernameBlock`
+        // s'affiche sous condition de `joueurState.level`, et un coup sans gain d'XP
+        // renvoyait `level: null` — la fiche du joueur était alors remplacée par un
+        // chargement perpétuel jusqu'au F5. « Aucune XP gagnée » n'est pas « aucun niveau ».
+        $this->assertNotNull($reponse['level'], "Un coup sans gain d'XP renvoie le niveau COURANT.");
+        $this->assertGreaterThan(0, $reponse['level']);
+        $this->assertNotNull($reponse['newExperience']);
+    }
+
+    /** Même trou côté soin : se soigner soi-même ne rapporte rien, mais on a toujours un niveau. */
+    public function testUnSoinSansGainRenseigneQuandMemeLeNiveau(): void
+    {
+        $client = static::createClient();
+        [$a, $tokenA] = $this->duel($client);
+        $sort = $this->sortSoin();
+        if ($sort === null) {
+            $this->markTestSkipped('Le seed ne fournit aucun sort de soin.');
+        }
+
+        $this->sql('UPDATE user SET current_life = 1 WHERE id = ?', [$a['id']]);
+        $reponse = $this->jsonRequest($client, '/api/joueur/attack/joueur', [
+            'targetId' => $a['id'], 'spellId' => $sort['id'],
+        ], $tokenA);
+        $this->assertResponseIsSuccessful();
+
+        $this->assertSame(0, $reponse['experience'], 'Se soigner soi-même ne rapporte rien.');
+        $this->assertNotNull($reponse['level']);
+        $this->assertNotNull($reponse['newExperience']);
     }
 
     /** `killMessage` est ce qui fait DÉCIBLER côté front : sans lui, on reste accroché au mort. */
@@ -167,23 +196,93 @@ class PvpApiFunctionalTest extends WebTestCase
         $this->assertStringContainsString('réapparaître', $reponse['message']);
     }
 
-    /** Le feu ami : la seule règle qui donne une conséquence de jeu à l'alignement. */
-    public function testOnNAttaquePasSonPropreCamp(): void
+    /* ---------------------------------------------------------------- */
+    /* Feu ami                                                           */
+    /* ---------------------------------------------------------------- */
+
+    /**
+     * Frapper un allié est PERMIS — et se paie en honneur ET en karma.
+     *
+     * Ce que ce test verrouille, c'est l'inversion : l'ancienne règle refusait le coup, ce qui
+     * rendait la trahison impossible plutôt que coûteuse.
+     */
+    public function testFrapperUnAllieEstPermisMaisCouteHonneurEtKarma(): void
     {
-        if (PvpConfig::FEU_AMI_AUTORISE) {
-            $this->markTestSkipped('Le feu ami est autorisé par la configuration.');
+        if (!PvpConfig::FEU_AMI_AUTORISE) {
+            $this->markTestSkipped('Le feu ami est interdit par la configuration.');
         }
 
         $client = static::createClient();
         [$a, $tokenA, $b] = $this->duel($client);
         $this->sql('UPDATE user SET alignement_id = 1 WHERE id = ?', [$b['id']]);
+        $this->sql('UPDATE user SET honneur = 0, karma = 0 WHERE id = ?', [$a['id']]);
 
         $reponse = $this->jsonRequest($client, '/api/joueur/attack/joueur', [
             'targetId' => $b['id'], 'spellId' => $this->sortAttaque()['id'],
         ], $tokenA);
 
-        $this->assertSame(400, $client->getResponse()->getStatusCode());
-        $this->assertStringContainsString('camp', $reponse['message']);
+        $this->assertResponseIsSuccessful();
+        $this->assertNotNull($reponse['feuAmi'], "Le prix de la trahison est annoncé au joueur.");
+        $this->assertSame(PvpConfig::FEU_AMI_HONNEUR_PAR_COUP, $reponse['feuAmi']['honneur']['delta']);
+        $this->assertSame(PvpConfig::FEU_AMI_KARMA_PAR_COUP, $reponse['feuAmi']['karma']['delta']);
+        $this->assertFalse($reponse['feuAmi']['miseAMort']);
+
+        $etat = $this->sqlFetchAssoc('SELECT honneur, karma FROM user WHERE id = ?', [$a['id']]);
+        $this->assertSame(PvpConfig::FEU_AMI_HONNEUR_PAR_COUP, (int) $etat['honneur']);
+        $this->assertSame(PvpConfig::FEU_AMI_KARMA_PAR_COUP, (int) $etat['karma']);
+    }
+
+    /**
+     * Achever un allié coûte davantage, et ne rapporte NI honneur NI expérience.
+     *
+     * Le point du test est le zéro : si `appliquerVictoire` s'appliquait aussi au feu ami, une
+     * trahison rapporterait le gain de duel d'un côté et la pénalité de l'autre — et pourrait
+     * se rentabiliser. La victime, elle, ne perd rien : se faire poignarder par son camp n'est
+     * pas un échec au combat.
+     */
+    public function testAcheverUnAllieNeRapporteNiHonneurNiExperience(): void
+    {
+        if (!PvpConfig::FEU_AMI_AUTORISE) {
+            $this->markTestSkipped('Le feu ami est interdit par la configuration.');
+        }
+
+        $client = static::createClient();
+        [$a, $tokenA, $b] = $this->duel($client);
+        $this->sql('UPDATE user SET alignement_id = 1, current_life = 1 WHERE id = ?', [$b['id']]);
+        $this->sql('UPDATE user SET honneur = 0, karma = 0 WHERE id = ?', [$a['id']]);
+        $honneurVictimeAvant = (int) $this->sqlFetchAssoc('SELECT honneur FROM user WHERE id = ?', [$b['id']])['honneur'];
+
+        $reponse = $this->jsonRequest($client, '/api/joueur/attack/joueur', [
+            'targetId' => $b['id'], 'spellId' => $this->sortAttaque()['id'],
+        ], $tokenA);
+
+        $this->assertResponseIsSuccessful();
+        $this->assertTrue($reponse['kill']);
+        $this->assertNull($reponse['honneur'], "Il n'y a pas de victoire à célébrer.");
+        $this->assertSame(0, $reponse['experience']);
+        $this->assertTrue($reponse['feuAmi']['miseAMort']);
+        $this->assertSame(
+            PvpConfig::FEU_AMI_HONNEUR_PAR_COUP + PvpConfig::FEU_AMI_HONNEUR_MISE_A_MORT,
+            $reponse['feuAmi']['honneur']['delta']
+        );
+        $this->assertSame(
+            PvpConfig::FEU_AMI_KARMA_PAR_COUP + PvpConfig::FEU_AMI_KARMA_MISE_A_MORT,
+            $reponse['feuAmi']['karma']['delta']
+        );
+
+        $this->assertSame(
+            $honneurVictimeAvant,
+            (int) $this->sqlFetchAssoc('SELECT honneur FROM user WHERE id = ?', [$b['id']])['honneur'],
+            "La victime d'une trahison ne perd pas d'honneur."
+        );
+
+        // La trahison laisse sa trace : la pénalité, elle, se dissout dans `user.honneur`.
+        $evenement = $this->sqlFetchAssoc(
+            "SELECT JSON_EXTRACT(contexte, '$.feuAmi') AS feu_ami
+             FROM evenement_jeu WHERE type = 'mort_joueur' AND cible_user_id = ? ORDER BY id DESC LIMIT 1",
+            [$b['id']]
+        );
+        $this->assertSame('true', $evenement['feu_ami']);
     }
 
     public function testOnNeSAttaquePasSoiMeme(): void

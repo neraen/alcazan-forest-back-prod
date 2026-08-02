@@ -65,6 +65,14 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     #[ORM\Column(type: "datetime", nullable: true)]
     private $lastConnexion;
 
+    /**
+     * Dernière requête authentifiée — la PRÉSENCE, à ne pas confondre avec `lastConnexion`
+     * qui est la dernière ouverture de session. Un joueur connecté depuis six heures a une
+     * `lastConnexion` de six heures : elle ne peut pas dire s'il est encore là.
+     */
+    #[ORM\Column(type: "datetime", nullable: true)]
+    private ?\DateTimeInterface $derniereActivite = null;
+
     #[ORM\ManyToOne(targetEntity: Classe::class, cascade: ["persist"], inversedBy: "users")]
     private $classe;
 
@@ -436,6 +444,18 @@ class User implements PasswordAuthenticatedUserInterface, UserInterface
     public function setLastConnexion(?\DateTimeInterface $last_connexion): self
     {
         $this->lastConnexion = $last_connexion;
+
+        return $this;
+    }
+
+    public function getDerniereActivite(): ?\DateTimeInterface
+    {
+        return $this->derniereActivite;
+    }
+
+    public function setDerniereActivite(?\DateTimeInterface $derniereActivite): self
+    {
+        $this->derniereActivite = $derniereActivite;
 
         return $this;
     }

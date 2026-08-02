@@ -26,7 +26,7 @@ class DonjonMapView
     /** Champs de joueur produits par getAllCasesOfMap, à neutraliser puis réinjecter. */
     private const CHAMPS_JOUEUR = [
         'userId', 'pseudo', 'sexe', 'nomClasse', 'niveau',
-        'nomAlignement', 'iconeAlignement', 'nomGuilde',
+        'nomAlignement', 'iconeAlignement', 'nomGuilde', 'enLigne',
     ];
 
     public function __construct(

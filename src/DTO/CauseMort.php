@@ -27,9 +27,14 @@ final class CauseMort
         public readonly array $contexte = [],
     ) {}
 
-    public static function pvp(User $tueur): self
+    /**
+     * @param bool $feuAmi la victime était du camp du tueur. Consigné dans le journal parce
+     *        que c'est la seule trace durable d'une trahison : la pénalité, elle, se dissout
+     *        dans `user.honneur` et `user.karma` sans dire d'où elle vient.
+     */
+    public static function pvp(User $tueur, bool $feuAmi = false): self
     {
-        return new self('pvp', tueur: $tueur);
+        return new self('pvp', tueur: $tueur, contexte: $feuAmi ? ['feuAmi' => true] : []);
     }
 
     public static function monstre(int $monstreId): self

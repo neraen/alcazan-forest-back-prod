@@ -63,6 +63,29 @@ class LevelingService
         ];
     }
 
+    /**
+     * L'état de progression SANS rien y changer, dans la forme exacte que renvoie
+     * `giveExperienceToAPlayer`.
+     *
+     * Existe parce que « aucune XP gagnée » n'est pas « aucun niveau ». Les appelants qui
+     * n'accordaient pas d'XP renvoyaient `level: null` et `newExperience: null` au front —
+     * or `UsernameBlock` s'affiche sous condition de `joueurState.level`, et le mettre à
+     * null remplace la fiche du joueur par un chargement perpétuel jusqu'au F5. Le contrat
+     * partagé des endpoints d'attaque (doc §21.13 bis) veut une VALEUR, pas un trou.
+     *
+     * @return array{experience: int, level: int, experienceMax: int}
+     */
+    public function etatDe(int $userId): array
+    {
+        $levelData = $this->niveauJoueurRepository->getNiveauAndExperience($userId);
+
+        return [
+            'experience' => (int) $levelData['experienceActuelle'],
+            'level' => (int) $levelData['niveau'],
+            'experienceMax' => (int) $levelData['experienceMax'],
+        ];
+    }
+
     public function giveExpMalusAfterDeath(int $userId): int{
         $levelData = $this->niveauJoueurRepository->getNiveauAndExperience($userId);
         $experienceMaxLevel = $levelData['experienceMax'];

@@ -59,12 +59,36 @@ final class PvpConfig
     public const FENETRE_ANTI_FARM_HEURES = 6;
 
     /**
-     * Le feu ami. `false` = on ne peut pas frapper son propre camp.
+     * Le feu ami est AUTORISÉ : on peut frapper son propre camp — mais ça se paie.
      *
-     * C'est la seule règle qui donne aujourd'hui une conséquence de jeu à `user.alignement`
-     * en dehors des guildes — sans elle, l'alignement n'est qu'un badge.
+     * Interdire était le choix initial ; il rendait la trahison impossible plutôt que
+     * coûteuse, ce qui n'est pas la même chose. Un allié frappé reste une décision de jeu :
+     * elle doit avoir un prix, pas un mur.
+     *
+     * Le prix est double, et les deux moitiés ne mesurent pas la même chose :
+     *  - l'**honneur** est la conduite en duel — frapper un allié la salit ;
+     *  - le **karma** est la manière dont on se comporte dans le monde — trahir en est une.
+     * Les faire tomber ensemble est ce qui donne enfin une conséquence de jeu à
+     * `user.alignement` en dehors des guildes.
      */
-    public const FEU_AMI_AUTORISE = false;
+    public const FEU_AMI_AUTORISE = true;
+
+    /** Honneur perdu à CHAQUE coup porté à un allié. */
+    public const FEU_AMI_HONNEUR_PAR_COUP = -2;
+
+    /** Karma perdu à chaque coup porté à un allié. */
+    public const FEU_AMI_KARMA_PAR_COUP = -1;
+
+    /**
+     * Honneur perdu en ACHEVANT un allié, en plus du coup lui-même.
+     *
+     * Nettement plus lourd que le plus gros gain possible face à un ennemi : tuer un allié ne
+     * doit jamais pouvoir se rentabiliser, même en alternant les cibles.
+     */
+    public const FEU_AMI_HONNEUR_MISE_A_MORT = -60;
+
+    /** Karma perdu en achevant un allié, en plus du coup. */
+    public const FEU_AMI_KARMA_MISE_A_MORT = -15;
 
     /* ------------------------------------------------------------------ */
     /* Récompenses                                                         */

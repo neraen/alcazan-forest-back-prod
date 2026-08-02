@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Config\PresenceConfig;
 use App\Entity\DonjonInstanceMembre;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -33,6 +34,7 @@ class DonjonInstanceMembreRepository extends ServiceEntityRepository
                 'user.caseAbscisse as abscisse', 'user.caseOrdonnee as ordonnee',
                 'classe.nom as nomClasse', 'level.niveau as niveau',
                 'alignement.nom as nomAlignement', 'alignement.icone as iconeAlignement',
+                'CASE WHEN user.derniereActivite > :seuilPresence THEN 1 ELSE 0 END as enLigne',
                 'guilde.nom as nomGuilde'
             )
             ->join('membre.user', 'user')
@@ -47,6 +49,7 @@ class DonjonInstanceMembreRepository extends ServiceEntityRepository
             ->andWhere('user.map = :carteId')
             ->setParameter('instanceId', $instanceId)
             ->setParameter('carteId', $carteId)
+            ->setParameter('seuilPresence', PresenceConfig::seuilEnLigne())
             ->getQuery()
             ->getResult();
     }

@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Config\PresenceConfig;
 use App\Entity\CarteCarreau;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -52,10 +53,16 @@ class CarteCarreauRepository extends ServiceEntityRepository
             ->getQuery()->execute();
     }
 
+    /**
+     * `enLigne` est tranché par le SERVEUR, dans la requête (`CASE WHEN` DQL), et jamais
+     * recalculé côté client : le front ne connaît ni la fenêtre de présence ni l'horloge du
+     * serveur, et une date brute l'obligerait à deviner les deux.
+     */
     public function getAllCasesOfMap(int $mapId){
         return $this->createQueryBuilder('cc')
             ->select('carte.id as carteId', 'cc.id as carteCarreauId', 'cc.abscisse', 'cc.ordonnee',
                 'cc.targetMapId',  'cc.targetWrap', 'user.id as userId', 'user.pseudo', 'user.sexe',  'classe.nom as nomClasse',
+                'CASE WHEN user.derniereActivite > :seuilPresence THEN 1 ELSE 0 END as enLigne',
                 'cc.isUsable', 'cc.isWrap', 'carreau.type as typeCarreau, level.niveau as niveau,alignement.nom as nomAlignement', 'alignement.icone as iconeAlignement',
                 'monstreCarreau.id as hasMonstre','pnj.skin as pnjSkin', 'pnj.avatar as pnjAvatar', 'pnj.name as pnjName',
                 'pnj.description as pnjDescription', 'pnj.id as pnjId', 'guilde.nom as nomGuilde', 'boss.name as bossName', 'boss.icone as bossSkin', 'boss.id as bossId',
@@ -78,6 +85,7 @@ class CarteCarreauRepository extends ServiceEntityRepository
             ->leftJoin('user.alignement', 'alignement')
             ->where('cc.carte = '.$mapId)
             ->orderBy('carteCarreauId')
+            ->setParameter('seuilPresence', PresenceConfig::seuilEnLigne())
             ->getQuery()
             ->getResult();
     }
