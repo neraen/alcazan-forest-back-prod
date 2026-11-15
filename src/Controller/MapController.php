@@ -40,8 +40,15 @@ class MapController extends AbstractController
         InteractionService $interactionService
     ): Response {
         $data = json_decode($request->getContent(), true);
-        $mapId = $data['mapId'];
         $user = $this->getUser();
+        // Sans `mapId` : la carte où se trouve RÉELLEMENT le joueur. C'est la forme que le
+        // jeu doit utiliser pour se (re)charger. La réponse porte toujours la position du
+        // joueur (`abscisseJoueur`/`ordonneeJoueur`), quelle que soit la carte demandée :
+        // un client qui demandait une carte PÉRIMÉE (téléportation décidée par le serveur
+        // sans qu'il le sache) dessinait le personnage aux coordonnées d'une autre carte —
+        // au milieu d'un étang, sans case accessible. `mapId` explicite reste pour la
+        // CONSULTATION (MapMaker).
+        $mapId = $data['mapId'] ?? $user->getMap()->getId();
 
         // En instance, l'occupation ne vient plus de carte_carreau (OneToOne global) :
         // DonjonMapView réinjecte les membres du groupe du joueur.

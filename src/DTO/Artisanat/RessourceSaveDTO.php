@@ -16,6 +16,8 @@ class RessourceSaveDTO
         /** Nul = l'objet n'est (plus) une ressource de métier. */
         public readonly ?int $metierId = null,
         public readonly int $niveauRessource = 0,
+        /** Null/omis = conserver, chaîne vide = retirer le sprite. */
+        public readonly ?string $imageCarte = null,
     ) {}
 
     public function toArray(): array
@@ -28,6 +30,7 @@ class RessourceSaveDTO
             'prixVente' => $this->prixVente,
             'metierId' => $this->metierId,
             'niveauRessource' => $this->niveauRessource,
+            ...($this->imageCarte !== null ? ['imageCarte' => $this->imageCarte] : []),
         ];
     }
 }

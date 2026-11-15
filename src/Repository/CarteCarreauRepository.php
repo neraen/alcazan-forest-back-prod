@@ -30,11 +30,15 @@ class CarteCarreauRepository extends ServiceEntityRepository
             ->getQuery()->execute();
     }
 
+    /** Paramétrée : les coordonnées arrivent du client (déplacement). */
     public function findByCoordonnee($mapId, $abscisse, $ordonnee){
         return $this->createQueryBuilder('cc')
-            ->where('cc.abscisse = '.$abscisse)
-            ->andWhere('cc.ordonnee = '.$ordonnee)
-            ->andWhere('cc.carte = '.$mapId)
+            ->where('cc.abscisse = :abscisse')
+            ->andWhere('cc.ordonnee = :ordonnee')
+            ->andWhere('cc.carte = :carte')
+            ->setParameter('abscisse', (int)$abscisse)
+            ->setParameter('ordonnee', (int)$ordonnee)
+            ->setParameter('carte', (int)$mapId)
             ->getQuery()
             ->getResult();
     }
@@ -68,7 +72,7 @@ class CarteCarreauRepository extends ServiceEntityRepository
                 'pnj.description as pnjDescription', 'pnj.id as pnjId', 'guilde.nom as nomGuilde', 'boss.name as bossName', 'boss.icone as bossSkin', 'boss.id as bossId',
                 'action.name as actionName', 'action.id as actionId',
                 'interaction.id as interactionId', 'interaction.nom as interactionNom',
-                'interaction.skin as interactionSkin', 'interaction.type as interactionType')
+                "CASE WHEN interaction.type = 'recolter' THEN COALESCE(ressourceInteraction.imageCarte, interaction.skin) ELSE interaction.skin END as interactionSkin", 'interaction.type as interactionType')
             ->leftJoin('cc.carreau', 'carreau')
             ->leftJoin('cc.carte', 'carte')
             ->leftJoin('cc.joueur', 'user')
@@ -76,6 +80,8 @@ class CarteCarreauRepository extends ServiceEntityRepository
             ->leftJoin('cc.pnj', 'pnj')
             ->leftJoin('cc.action', 'action')
             ->leftJoin('cc.interaction', 'interaction')
+            ->leftJoin('interaction.recompense', 'recompenseInteraction')
+            ->leftJoin('recompenseInteraction.objet', 'ressourceInteraction')
             ->leftJoin('cc.boss', 'boss')
             ->leftJoin('user.classe', 'classe')
             ->leftJoin('user.joueurGuildes', 'appartenance', 'WITH', "appartenance.statut = 'membre'")

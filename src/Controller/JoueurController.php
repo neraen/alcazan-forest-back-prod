@@ -24,8 +24,10 @@ use App\Repository\UserRepository;
 use App\Repository\UserSortilegeRepository;
 use App\Repository\WrapRepository;
 use App\Enum\TypeCumul;
+use App\Exception\DeplacementException;
 use App\Exception\DonjonException;
 use App\service\CumulJoueurService;
+use App\service\DeplacementService;
 use App\service\DonjonInstanceService;
 use App\service\DonjonMapView;
 use App\service\DonjonSalleService;
@@ -391,6 +393,7 @@ class JoueurController extends AbstractController
         CarteCarreauRepository  $carteCarreauRepository,
         DonjonInstanceService   $donjonInstanceService,
         DonjonMapView           $donjonMapView,
+        DeplacementService      $deplacementService,
         EntityManagerInterface  $entityManager
     ): Response {
         $data = json_decode($request->getContent(), true);
@@ -401,15 +404,27 @@ class JoueurController extends AbstractController
         $instance = $donjonInstanceService->instanceCourante($user);
         $enInstance = $instance !== null && $instance->contientCarte((int)$mapId);
 
-        if($data['mapId'] == $mapId){
-            $newCase = $carteCarreauRepository->findByCoordonnee($data['mapId'], $data['caseAbscisse'], $data['caseOrdonnee']);
+        // `mapId` différent de la carte réelle : client périmé. On ne bouge pas et on renvoie
+        // l'état frais (carte réelle comprise), que le client réadopte — c'est une
+        // resynchronisation, pas une triche.
+        if(isset($data['mapId']) && $data['mapId'] == $mapId){
+            $abscisse = (int)($data['caseAbscisse'] ?? -1);
+            $ordonnee = (int)($data['caseOrdonnee'] ?? -1);
+            $newCase = $carteCarreauRepository->findByCoordonnee((int)$mapId, $abscisse, $ordonnee);
+
+            // Le serveur fait foi sur la légalité du pas (voisinage, décor, PNJ, PM).
+            try{
+                $deplacementService->verifierPas($user, $newCase[0] ?? null);
+            }catch(DeplacementException $exception){
+                return new JsonResponse(['message' => $exception->getMessage()], Response::HTTP_BAD_REQUEST);
+            }
 
             // En instance, `carte_carreau.joueur_id` n'est ni lu ni écrit (OneToOne global,
             // incompatible avec plusieurs groupes) : la collision se juge entre membres.
             $occupee = $enInstance
                 ? $donjonMapView->positionOccupeeDansInstance(
                     $instance->getId(), (int)$mapId,
-                    (int)$data['caseAbscisse'], (int)$data['caseOrdonnee'], $user->getId()
+                    $abscisse, $ordonnee, $user->getId()
                 )
                 : $newCase[0]->getJoueur() !== null;
 
@@ -417,9 +432,9 @@ class JoueurController extends AbstractController
                 if(!$enInstance){
                     $carteCarreauRepository->updatePlayerInCase($user);
                 }
-                $user->setCaseAbscisse($data['caseAbscisse']);
-                $user->setCaseOrdonnee($data['caseOrdonnee']);
-                $mouvementPoint = $user->getMouvementPoint() - 1;
+                $user->setCaseAbscisse($abscisse);
+                $user->setCaseOrdonnee($ordonnee);
+                $mouvementPoint = $user->getMouvementPoint() - DeplacementService::COUT_D_UN_PAS;
                 $user->setMouvementPoint($mouvementPoint);
                 $entityManager->persist($user);
                 $entityManager->flush();
@@ -520,6 +535,15 @@ class JoueurController extends AbstractController
                     $newCaseEntity->getAbscisse(), $newCaseEntity->getOrdonnee(), $user->getId()
                 )
                 : $newCaseEntity->getJoueur() !== null;
+
+            // Case d'arrivée prise entre-temps (course entre deux joueurs) : REFUS explicite.
+            // Répondre la nouvelle carte sans avoir bougé le joueur faisait croire au client
+            // qu'il avait changé de carte alors que le serveur le gardait sur l'ancienne.
+            if($occupee) {
+                return new Response(json_encode([
+                    'message' => "Le passage est encombré, réessayez dans un instant.",
+                ]));
+            }
 
             if(!$occupee) {
                 // Libère toujours la case du monde ouvert qu'on quittait, y compris en

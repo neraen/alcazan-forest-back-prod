@@ -231,6 +231,36 @@ class ArtisanatEditorApiFunctionalTest extends WebTestCase
         $this->assertNotNull($this->sqlFetchOne('SELECT id FROM objet WHERE id = ?', [$objetId]), "L'objet survit");
     }
 
+    public function testImageCarteEstIndependanteEtSurvitALaRelecture(): void
+    {
+        $client = static::createClient();
+        $token = $this->admin($client);
+        $id = $this->creerObjet('Sauge');
+        $payload = ['id' => $id, 'nom' => 'Sauge', 'image' => 'inventaire.png', 'imageCarte' => 'sauge-carte'];
+        $liste = $this->jsonRequest($client, '/api/artisanat/editor/ressource/save', $payload, $token);
+        $this->assertResponseIsSuccessful();
+        $fiche = array_values(array_filter($liste['ressources'], fn ($r) => $r['id'] === $id))[0];
+        $this->assertSame('sauge-carte', $fiche['imageCarte']);
+        $this->assertSame('inventaire.png', $fiche['image']);
+        // Ancien client : le champ absent ne doit pas effacer l'image.
+        unset($payload['imageCarte']);
+        $this->jsonRequest($client, '/api/artisanat/editor/ressource/save', $payload, $token);
+        $this->assertSame('sauge-carte', $this->sqlFetchOne('SELECT image_carte FROM objet WHERE id = ?', [$id]));
+        $payload['imageCarte'] = '';
+        $this->jsonRequest($client, '/api/artisanat/editor/ressource/save', $payload, $token);
+        $this->assertNull($this->sqlFetchOne('SELECT image_carte FROM objet WHERE id = ?', [$id]));
+    }
+
+    public function testImageCarteRefuseUnChemin(): void
+    {
+        $client = static::createClient();
+        $token = $this->admin($client);
+        $this->jsonRequest($client, '/api/artisanat/editor/ressource/save', [
+            'nom' => 'Sauge', 'imageCarte' => '../invalide.png',
+        ], $token);
+        $this->assertResponseStatusCodeSame(400);
+    }
+
     /* ------------------------------------------------------------------ */
 
     private function sauvegarderRecette(KernelBrowser $client, string $token, int $metierId, array $ingredients): array

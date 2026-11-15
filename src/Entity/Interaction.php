@@ -142,6 +142,16 @@ class Interaction
         return $this;
     }
 
+    /** Le sprite de la ressource est partagé par tous ses points de récolte. */
+    public function getSkinCarte(): ?string
+    {
+        if ($this->type === TypeInteraction::RECOLTER) {
+            return $this->recompense?->getObjet()?->getImageCarte() ?: $this->skin;
+        }
+
+        return $this->skin;
+    }
+
     public function getSkin(): ?string
     {
         return $this->skin;

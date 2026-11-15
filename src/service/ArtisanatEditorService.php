@@ -76,6 +76,7 @@ class ArtisanatEditorService
                 'nom' => $objet->getName(),
                 'description' => $objet->getDescription(),
                 'image' => $objet->getImage(),
+                'imageCarte' => $objet->getImageCarte(),
                 'metier' => $objet->getMetier()?->getNom(),
                 'metierId' => $objet->getMetier()?->getId(),
                 'niveauRessource' => $objet->getNiveauRessource(),
@@ -248,6 +249,15 @@ class ArtisanatEditorService
             $metier = isset($data['metierId']) && $data['metierId'] > 0
                 ? $this->trouverMetier((int)$data['metierId'])
                 : null;
+
+            // Un ancien formulaire qui omet le champ ne doit pas effacer le sprite.
+            if (array_key_exists('imageCarte', $data)) {
+                $imageCarte = trim((string)($data['imageCarte'] ?? ''));
+                if ($imageCarte !== '' && !preg_match('/\A[a-zA-Z0-9_-]{1,255}\z/', $imageCarte)) {
+                    throw new CraftException("L’image de carte doit être un nom de fichier PNG sans extension ni dossier.");
+                }
+                $objet->setImageCarte($imageCarte ?: null);
+            }
 
             $objet->setName($nom)
                 ->setDescription($data['description'] ?? null)

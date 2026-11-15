@@ -113,7 +113,7 @@ class InteractionService
             'nom' => $interaction->getNom(),
             'verbe' => $interaction->getType()->verbe(),
             'type' => $interaction->getType()->value,
-            'skin' => $interaction->getSkin(),
+            'skin' => $interaction->getSkinCarte(),
             'coutPa' => $interaction->getCoutPa(),
             'recolteChoix' => $interaction->isRecolteChoix(),
             'disponible' => $raison === null,

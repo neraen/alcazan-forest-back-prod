@@ -181,4 +181,78 @@ class ApiFunctionalTest extends WebTestCase
         $this->assertSame(799, $data['pm']);
         $this->assertNotEmpty($data['cases']);
     }
+
+    /**
+     * Le serveur fait foi sur la légalité d'un pas : avant, n'importe quelle case libre
+     * envoyée par un client modifié était appliquée (téléportation, décor traversé, PM
+     * négatifs). Chaque refus est un 400 `{"message"}`, et ne touche ni à la position ni
+     * aux PM.
+     *
+     * @dataProvider pasIllegaux
+     */
+    public function testUnPasIllegalEstRefuse(array $depart, int $pm, array $destination, string $motif): void
+    {
+        $client = static::createClient();
+        $user = $this->registerUser($client);
+        $token = $this->login($client, $user);
+
+        $connexion = static::getContainer()->get('doctrine')->getConnection();
+        $connexion->executeStatement(
+            'UPDATE user SET map_id = 2, case_abscisse = ?, case_ordonnee = ?, mouvement_point = ? WHERE id = ?',
+            [$depart[0], $depart[1], $pm, $user['id']]
+        );
+
+        $data = $this->jsonRequest($client, '/api/joueur/case/update_position', [
+            'mapId' => 2,
+            'caseAbscisse' => $destination[0],
+            'caseOrdonnee' => $destination[1],
+        ], $token);
+
+        $this->assertResponseStatusCodeSame(400, $motif);
+        $this->assertStringContainsString($motif, $data['message']);
+
+        $apres = $connexion->fetchAssociative(
+            'SELECT case_abscisse, case_ordonnee, mouvement_point FROM user WHERE id = ?',
+            [$user['id']]
+        );
+        $this->assertSame([$depart[0], $depart[1], $pm], [
+            (int)$apres['case_abscisse'], (int)$apres['case_ordonnee'], (int)$apres['mouvement_point'],
+        ], 'Un pas refusé ne déplace pas et ne coûte rien');
+    }
+
+    public static function pasIllegaux(): iterable
+    {
+        // Carte 2 (tutoriel) : (11,10) est un décor infranchissable, le PNJ 1 est en (6,11).
+        yield 'téléportation' => [[9, 9], 800, [12, 9], 'trop loin'];
+        yield 'décor infranchissable' => [[10, 9], 800, [11, 10], 'obstacle'];
+        yield 'case d\'un PNJ' => [[7, 11], 800, [6, 11], 'Quelqu\'un'];
+        yield 'plus de PM' => [[9, 9], 0, [10, 9], 'points de mouvement'];
+        yield 'case hors carte' => [[0, 0], 800, [-1, 0], 'n\'existe pas'];
+        yield 'sur place' => [[9, 9], 800, [9, 9], 'déjà sur cette case'];
+    }
+
+    /**
+     * Sans `mapId`, la carte renvoyée est celle où se trouve RÉELLEMENT le joueur. C'est ce
+     * qui empêche un client à l'état périmé de dessiner le personnage aux coordonnées d'une
+     * autre carte (le « téléporté au milieu d'un étang » de l'app mobile).
+     */
+    public function testLaCarteSansIdEstCelleOuSeTrouveLeJoueur(): void
+    {
+        $client = static::createClient();
+        $user = $this->registerUser($client);
+        $token = $this->login($client, $user);
+
+        $data = $this->jsonRequest($client, '/api/map/cases/data', [], $token);
+
+        $this->assertResponseIsSuccessful();
+        $this->assertSame(2, (int)$data['mapId'], 'Un nouveau joueur est sur la carte de départ');
+        $this->assertSame(9, $data['abscisseJoueur']);
+        $this->assertSame(9, $data['ordonneeJoueur']);
+        $this->assertNotEmpty($data['cases']);
+
+        // La consultation explicite d'une autre carte reste possible (MapMaker).
+        $autre = $this->jsonRequest($client, '/api/map/cases/data', ['mapId' => 1], $token);
+        $this->assertResponseIsSuccessful();
+        $this->assertSame(1, (int)$autre['mapId']);
+    }
 }

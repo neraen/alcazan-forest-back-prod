@@ -37,6 +37,10 @@ class Objet
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
     private $image;
 
+    /** Sprite de récolte, dans img/interaction, sans extension. */
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $imageCarte = null;
+
     #[ORM\OneToMany(mappedBy: 'objet', targetEntity: Recompense::class)]
     private $recompenses;
 
@@ -200,6 +204,18 @@ class Objet
                 $inventaireObjet->setObjet(null);
             }
         }
+
+        return $this;
+    }
+
+    public function getImageCarte(): ?string
+    {
+        return $this->imageCarte;
+    }
+
+    public function setImageCarte(?string $imageCarte): self
+    {
+        $this->imageCarte = $imageCarte ?: null;
 
         return $this;
     }
