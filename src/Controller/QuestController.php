@@ -9,6 +9,7 @@ use App\DTO\Quest\QuestStartDTO;
 use App\Exception\QuestException;
 use App\Repository\PnjRepository;
 use App\service\PnjInteractionService;
+use App\service\QuestJournalService;
 use App\service\QuestProgressionService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,7 +28,8 @@ class QuestController extends AbstractController
     public function __construct(
         private readonly QuestProgressionService $questProgressionService,
         private readonly PnjInteractionService $pnjInteractionService,
-        private readonly PnjRepository $pnjRepository
+        private readonly PnjRepository $pnjRepository,
+        private readonly QuestJournalService $questJournalService
     ){}
 
     /** Ouverture d'un PNJ : lecture pure, la vue dépend du type du PNJ. */
@@ -42,6 +44,16 @@ class QuestController extends AbstractController
 
             return $this->pnjInteractionService->getInteraction($this->getUser(), $pnj);
         });
+    }
+
+    /**
+     * Journal de quêtes du joueur : en cours (étape, PNJ à aller voir, objectifs),
+     * disponibles, terminées. Lecture pure.
+     */
+    #[Route("/quest/journal", name: "quest_journal", methods: ["POST"])]
+    public function journal(): Response
+    {
+        return $this->handle(fn (): array => $this->questJournalService->journal($this->getUser()));
     }
 
     /** Démarrage explicite de la quête d'un PNJ (prérequis vérifiés). */

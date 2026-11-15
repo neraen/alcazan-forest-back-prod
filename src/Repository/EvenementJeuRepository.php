@@ -414,4 +414,30 @@ class EvenementJeuRepository extends ServiceEntityRepository
 
         return $total;
     }
+
+    /**
+     * Date de fin de chaque quête terminée par le joueur : `[queteId => 'Y-m-d H:i:s']`.
+     *
+     * Lue dans le journal et non sur `user_quete`, qui ne porte aucune date. Une quête
+     * finie avant le journal (01/08/2026) ou au-delà de la rétention n'a donc PAS de date,
+     * et l'appelant doit le dire plutôt qu'en inventer une.
+     *
+     * @return array<int, string>
+     */
+    public function datesQuetesTerminees(int $userId): array
+    {
+        $lignes = $this->getEntityManager()->getConnection()->fetchAllAssociative(
+            'SELECT cible_id, MAX(cree_le) AS fin FROM evenement_jeu
+             WHERE acteur_id = :user AND type = :type AND cible_id IS NOT NULL
+             GROUP BY cible_id',
+            ['user' => $userId, 'type' => TypeEvenement::QUETE_TERMINEE->value]
+        );
+
+        $dates = [];
+        foreach ($lignes as $ligne) {
+            $dates[(int) $ligne['cible_id']] = (string) $ligne['fin'];
+        }
+
+        return $dates;
+    }
 }

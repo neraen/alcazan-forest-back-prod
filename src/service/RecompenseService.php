@@ -122,6 +122,55 @@ class RecompenseService
         return null;
     }
 
+    /**
+     * Ce que rapporterait une récompense, SANS rien distribuer — pour l'annoncer (journal
+     * de quêtes). Même forme que les `rewards` de `distribuer()`, plus le nom de fichier
+     * BRUT de l'image (et la position d'un équipement, dont dépend le dossier) : les
+     * chemins vivent côté client.
+     *
+     * Vit ici et pas chez l'appelant pour que l'annonce et la distribution ne puissent pas
+     * diverger (quantité ramenée à 1, XP et or ignorés à zéro).
+     *
+     * @return list<array{type: string, id: ?int, label: string, quantity: int, image: ?string, position: ?string}>
+     */
+    public function apercu(?Recompense $recompense): array
+    {
+        if ($recompense === null) {
+            return [];
+        }
+
+        $apercu = [];
+        $quantity = max(1, (int)$recompense->getQuantity());
+
+        if ($recompense->getEquipement() !== null) {
+            $equipement = $recompense->getEquipement();
+            $apercu[] = ['type' => 'equipement', 'id' => $equipement->getId(), 'label' => (string)$equipement->getNom(), 'quantity' => 1,
+                'image' => $equipement->getIcone(), 'position' => $equipement->getPositionEquipement()?->getName()];
+        }
+
+        if ($recompense->getConsommable() !== null) {
+            $consommable = $recompense->getConsommable();
+            $apercu[] = ['type' => 'consommable', 'id' => $consommable->getId(), 'label' => (string)$consommable->getNom(), 'quantity' => $quantity,
+                'image' => $consommable->getIcone(), 'position' => null];
+        }
+
+        if ($recompense->getObjet() !== null) {
+            $objet = $recompense->getObjet();
+            $apercu[] = ['type' => 'objet', 'id' => $objet->getId(), 'label' => (string)$objet->getName(), 'quantity' => $quantity,
+                'image' => $objet->getImage(), 'position' => null];
+        }
+
+        if ($recompense->getMoney() !== null && $recompense->getMoney() > 0) {
+            $apercu[] = ['type' => 'or', 'id' => null, 'label' => "pièces d'or", 'quantity' => (int)$recompense->getMoney(), 'image' => null, 'position' => null];
+        }
+
+        if ($recompense->getExperience() !== null && $recompense->getExperience() > 0) {
+            $apercu[] = ['type' => 'experience', 'id' => null, 'label' => "points d'expérience", 'quantity' => (int)$recompense->getExperience(), 'image' => null, 'position' => null];
+        }
+
+        return $apercu;
+    }
+
     /** Phrase de feedback joueur pour une liste de récompenses distribuées. */
     public function decrireRecompenses(array $rewards): array
     {

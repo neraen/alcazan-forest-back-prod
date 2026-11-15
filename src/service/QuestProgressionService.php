@@ -605,8 +605,14 @@ class QuestProgressionService
         };
     }
 
-    /** {current, target, unit} pour un bouton d'objectif compté — null sinon. */
-    private function buildProgress(Action $action, User $user, ?UserQuete $userQuete): ?array
+    /**
+     * {current, target, unit} pour un bouton d'objectif compté — null sinon.
+     *
+     * Public pour le journal de quêtes (`QuestJournalService`) : la progression d'un
+     * objectif ne doit se calculer qu'ICI, sans quoi le journal et le dialogue du PNJ
+     * finiraient par annoncer deux chiffres différents pour la même chasse.
+     */
+    public function buildProgress(Action $action, User $user, ?UserQuete $userQuete): ?array
     {
         $compteur = $action->getActionType()?->compteur();
         if ($compteur === null) {
